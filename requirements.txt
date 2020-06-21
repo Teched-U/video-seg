@@ -1,0 +1,9 @@
+ffmpeg-python
+webrtcvad
+aubio
+nltk
+matplotlib
+statsmodels
+seaborn
+sklearn
+gensim

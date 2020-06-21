@@ -8,8 +8,8 @@ import seaborn as sns
 import nltk
 
 # FIXME: why am I stuck at below
-# nltk.download('punkt')
-# nltk.download('averaged_perceptron_tagger')
+nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger')
 
 
 '''Shot representation'''

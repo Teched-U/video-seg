@@ -3,6 +3,7 @@
 import glob
 import os.path as path
 from typing import Tuple, List
+import click
 
 from lib.extract_audio import extract_audio
 from lib.vad import process
@@ -31,17 +32,18 @@ def process_video(video_file: str, docSim: DocSim, stopwords: List[str]) -> None
     transcript_arr = []
     chunks = []
     previous_end_ts = 0.0
+    wordvecs = []
     for idx, segment in enumerate(segments):
         # Get transcript
         result = transcribe(segment['bytes'])
         transcript = result['hypotheses'][0]['utterance']
+        print(transcript)
         transcript_arr.append(transcript)
 
         # Get features
         pitch, volume = extract_features(segment['bytes'])
         pause_time = float(segment['timestamp']) - previous_end_ts
         feature = {
-            'init_time': segment['timestamp'],
             'pause': pause_time,
             'pitch': pitch,
             'volume': volume 
@@ -57,6 +59,14 @@ def process_video(video_file: str, docSim: DocSim, stopwords: List[str]) -> None
         )
         shot.extractTranscriptAndConcepts(transcript, False, docSim=docSim)
         chunks.append(shot)
+        
+        # Get wordvecotr
+        wv = shot.word2vec if shot.valid_vector else None
+        wordvecs.append(wv)
+
+        if wv is not None:
+            print(type(wv))
+            print(len(wv))
 
     chunks = [s for s in chunks if s.valid_vector]
     if len(chunks) < 2:
@@ -72,7 +82,30 @@ def process_video(video_file: str, docSim: DocSim, stopwords: List[str]) -> None
     print(boundaries, flush=True)
     
 
+@click.command()
+@click.option(
+    "-i",
+    "--input-path",
+    type=str,
+    help="ABSOLUTE path to video folders"
+)
+@cilick.option(
+    "-s",
+    "source",
+    default="easytopic",
+    type=str,
+    help="Data souce"
+)
+def main(
+    input_path: str,
+    source: str
+    ) -> None:
 
+    if source == "easytopic":
+        videos = next(os.walk(input_path))[1]
+        print(videos)
+    else:
+        raise ValueError(f"not supported {source}")
 
 
 if __name__ == '__main__':

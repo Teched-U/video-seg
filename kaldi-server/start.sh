@@ -1,10 +1,8 @@
 #!/bin/bash
 
-# HACK: use tornado 4.3 
-pip install -U tornado==4.3 --force-reinstall
-
 MASTER="localhost"
-PORT=80
+PORT=8080
+GSTREAM_ROOT=/home/techedu/kaldi-gstreamer-server
 
 usage(){
   echo "Creates a worker and connects it to a master.";
@@ -36,10 +34,10 @@ fi;
 
 if [ "$MASTER" == "localhost" ] ; then
   # start a local master
-  python /opt/kaldi-gstreamer-server/kaldigstserver/master_server.py --port=$PORT 2>> /opt/master.log &
+  python3 $GSTREAM_ROOT/kaldigstserver/master_server.py --port=$PORT 2>> master.log &
 fi
 
 #start worker and connect it to the master
-export GST_PLUGIN_PATH=/opt/gst-kaldi-nnet2-online/src/:/opt/kaldi/src/gst-plugin/
+export GST_PLUGIN_PATH=/home/techedu/gst-kaldi-nnet2-online/src/:/home/techedu/kaldi/src/gst-plugin/
 
-python /opt/kaldi-gstreamer-server/kaldigstserver/worker.py -c $YAML -u ws://$MASTER:$PORT/worker/ws/speech 2>> /opt/worker.log &
+python3 $GSTREAM_ROOT/kaldigstserver/worker.py -c $YAML -u ws://$MASTER:$PORT/worker/ws/speech 2>> worker.log &

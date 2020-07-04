@@ -1,15 +1,15 @@
 # You have to download TEDLIUM "online nnet2" models in order to use this sample
-# Run download-tedlium-nnet2.sh in '/opt/models' to download them.
+# Run download-tedlium-nnet2.sh in '/media/kaldi_models' to download them.
 use-nnet2: True
 decoder:
     # All the properties nested here correspond to the kaldinnet2onlinedecoder GStreamer plugin properties.
     # Use gst-inspect-1.0 ./libgstkaldionline2.so kaldinnet2onlinedecoder to discover the available properties
     use-threaded-decoder:  true
-    model : /opt/models/english/tedlium_nnet_ms_sp_online/final.mdl
-    word-syms : /opt/models/english/tedlium_nnet_ms_sp_online/words.txt
-    fst : /opt/models/english/tedlium_nnet_ms_sp_online/HCLG.fst
-    mfcc-config : /opt/models/english/tedlium_nnet_ms_sp_online/conf/mfcc.conf
-    ivector-extraction-config : /opt/models/english/tedlium_nnet_ms_sp_online/conf/ivector_extractor.conf
+    model : /media/kaldi_models/english/tedlium_nnet_ms_sp_online/final.mdl
+    word-syms : /media/kaldi_models/english/tedlium_nnet_ms_sp_online/words.txt
+    fst : /media/kaldi_models/english/tedlium_nnet_ms_sp_online/HCLG.fst
+    mfcc-config : /media/kaldi_models/english/tedlium_nnet_ms_sp_online/conf/mfcc.conf
+    ivector-extraction-config : /media/kaldi_models/english/tedlium_nnet_ms_sp_online/conf/ivector_extractor.conf
     max-active: 10000
     beam: 10.0
     lattice-beam: 6.0
@@ -20,10 +20,10 @@ decoder:
     chunk-length-in-secs: 0.25
     num-nbest: 1
     #Additional functionality that you can play with:
-    #lm-fst:  /opt/models/english/tedlium_nnet_ms_sp_online/G.fst
-    #big-lm-const-arpa: /opt/models/english/tedlium_nnet_ms_sp_online/G.carpa
-    #phone-syms: /opt/models/english/tedlium_nnet_ms_sp_online/phones.txt
-    #word-boundary-file: /opt/models/english/tedlium_nnet_ms_sp_online/word_boundary.int
+    #lm-fst:  /media/kaldi_models/english/tedlium_nnet_ms_sp_online/G.fst
+    #big-lm-const-arpa: /media/kaldi_models/english/tedlium_nnet_ms_sp_online/G.carpa
+    #phone-syms: /media/kaldi_models/english/tedlium_nnet_ms_sp_online/phones.txt
+    #word-boundary-file: /media/kaldi_models/english/tedlium_nnet_ms_sp_online/word_boundary.int
     #do-phone-alignment: true
 out-dir: tmp
 
@@ -31,7 +31,7 @@ use-vad: False
 silence-timeout: 10
 
 # Just a sample post-processor that appends "." to the hypothesis
-post-processor: perl -npe 'BEGIN {use IO::Handle; STDOUT->autoflush(1);} sleep(1); s/(.*)/\1./;'
+# post-processor: perl -npe 'BEGIN {use IO::Handle; STDOUT->autoflush(1);} sleep(1); s/(.*)/\1./;'
 
 #post-processor: (while read LINE; do echo $LINE; done)
 

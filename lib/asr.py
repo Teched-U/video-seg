@@ -5,8 +5,12 @@ import os
 import tempfile
 import wave
 import numpy as np
+import urllib
 import json
+from concurrent.futures import ThreadPoolExecutor
 import time
+
+from .asr_client import MyClient
 
 
 def transcribeAudio(path_to_audio_file, samplerate=16000):
@@ -59,3 +63,35 @@ def transcribe(audio_chunk):
                 print(e)
                 print('trying again', flush=True)
                 time.sleep(0.5)
+
+def transcribe_ws(
+    audio_chunk, 
+    save_adaptation_state = None, 
+    send_adaptation_state = None,
+    uri :str = "ws://localhost:8080/client/ws/speech",
+    content_type :str = "",
+    ):
+    fd, path = tempfile.mkstemp(suffix='.wav')
+    with open(path, 'w+b') as fp:
+        sample_rate = 16000
+        wf = wave.open(fp, 'w')
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(np.frombuffer(audio_chunk, dtype=np.uint8))
+        wf.close()
+    with open(path, 'r+b') as fp:
+        ws = MyClient(
+            fp, 
+            uri + f'?{urllib.parse.urlencode([("content-type", content_type)])}',
+            ThreadPoolExecutor(),
+            byterate=sample_rate * 2,
+            save_adaptation_state_filename=save_adaptation_state, 
+            send_adaptation_state_filename=send_adaptation_state
+            )
+
+        result = ws.get_full_hyp()
+        return result
+        
+
+

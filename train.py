@@ -2,6 +2,7 @@
 import time
 
 from dataset import VideoSegDataset 
+from metric import evaluate_metrics
 from model_baseline import SeqModel
 from torch.utils.data import DataLoader
 import torch
@@ -59,6 +60,37 @@ def train_epoch(model, data_set, optimizer, criterion, epoch, scheduler, start_t
             total_loss = 0
             start_time = time.time()
 
+def evaluate(model :SeqModel, data: VideoSegDataset, criterion): 
+    model.eval()
+    total_loss = 0.
+    total_recall = 0.
+    total_precision = 0.
+    total_fscore = 0.
+    with torch.no_grad():
+        for i, sample in enumerate(data):
+            x, y =  sample
+            # Hack to mimic batch of 1
+            x = x.unsqueeze(1)
+            output = model(x)
+            
+            _, predicted = torch.max(output, 2)
+            ts = data.get_ts(i)
+            raw_gt = data.get_raw_gt(i)
+
+            # Remove the batch dim
+            predicted = predicted.squeeze()
+
+            recall, precision, fscore = evaluate_metrics(predicted, ts, raw_gt)
+
+            output_flat = output.view(-1, 2)
+            total_loss += criterion(output_flat, y).item()
+            total_recall += recall
+            total_precision += precision
+            total_fscore += fscore
+
+    return total_loss/len(data), total_recall/len(data), total_precision/len(data), total_fscore/len(data)
+
+
     
 DATA_FOLDER="/home/techedu/video-seg/data/easytopic"
 RESULT_FOLDER="/home/techedu/video-seg/data/easytopic-gt/ground_truths"
@@ -78,33 +110,31 @@ def train() -> None:
 
     model = SeqModel(ntoken, emsize, nhead, nhid, nlayers, dropout).to(device)
 
-    criterion = nn.CrossEntropyLoss()
-    lr = 5.0 # learning rate
+    criterion = nn.CrossEntropyLoss(weight=torch.Tensor([1, 5]))
+    lr = 0.01 # learning rate
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
 
 
-    data_set = VideoSegDataset(
+    train_data = VideoSegDataset(
         data_folder=DATA_FOLDER,
         result_folder=RESULT_FOLDER,
         )
 
+    val_data = train_data
+
     for epoch in range(1, epochs + 1):
         # Manual shuffle (Use a dataloader later)
-        data_set.shuffle()
+        train_data.shuffle()
         epoch_start_time = time.time()
-        train_epoch(model, data_set, optimizer, criterion, epoch, scheduler, epoch_start_time)
+        train_epoch(model, train_data, optimizer, criterion, epoch, scheduler, epoch_start_time)
 
-        # val_loss = evaluate(model, val_data)
-        # print('-' * 89)
-        # print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
-        #       'valid ppl {:8.2f}'.format(epoch, (time.time() - epoch_start_time),
-        #                                  val_loss, math.exp(val_loss)))
-        # print('-' * 89)
-    
-        # if val_loss < best_val_loss:
-        #     best_val_loss = val_loss
-        #     best_model = model
+        val_loss, recall, precision, fscore = evaluate(model, val_data, criterion)
+        print('-' * 89)
+        print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
+              'valid ppl {:8.2f} | recall: {:5.2f} | precision: {:5.2f} | fscore: {:5.2f}'.format(epoch, (time.time() - epoch_start_time),
+                                         val_loss, math.exp(val_loss), recall, precision, fscore))
+        print('-' * 89)
     
         scheduler.step()
 

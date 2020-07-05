@@ -66,12 +66,18 @@ class VideoSegDataset(Dataset):
         data_files = glob.glob(f"{data_folder}/*.json")
 
         # Init Word2Vec model
-
         self.docsim_model, self.stopwords = init_word2vec(GOOGLE_MODEL_PATH, STOPWORD_PATH)
 
         # Get features and labels 
         self.features = [] 
+
+        # Timestamps for each video
+        self.timestamps = []
+
+        # Ground truth timestamps (processed) for each video
         self.gts = []
+        self.raw_gts = []
+
         for data_file in data_files:
             # Get feature
             feature = None
@@ -85,15 +91,20 @@ class VideoSegDataset(Dataset):
                 feature, timestamp = self.encode_features(data)
                 if feature:
                     self.features.append(feature)
+                    self.timestamps.append(timestamp)
                 else:
                     # Invalid
                     continue
+
 
             # Get label
             video_name = os.path.basename(data_file)
             gt_file = os.path.join(result_folder, f"gt_{video_name}")
             with open(gt_file, "r") as f:
                 gt_data= json.load(f)
+                self.raw_gts.append(gt_data)
+
+                # one hot encode the ground truth to match the sequence of shots
                 gt = self.encode_gt(gt_data, timestamp, video_name)
                 self.gts.append(gt)
 
@@ -176,9 +187,16 @@ class VideoSegDataset(Dataset):
         return gt
 
     def shuffle(self):
-        data = list(zip(self.features, self.gts))
+        data = list(zip(self.features, self.gts, self.timestamps, self.raw_gts))
         random.shuffle(data)
-        self.features, self.gts = zip(*data)
+        self.features, self.gts, self.timestamps, self.raw_gts = zip(*data)
+
+    def get_ts(self, idx: int) -> List[float]:
+        return self.timestamps[idx]
+
+    def get_raw_gt(self, idx: int) -> List[float]:
+        return self.raw_gts[idx]
+
 
 
 

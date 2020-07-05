@@ -109,8 +109,8 @@ class VideoSegDataset(Dataset):
     def __getitem__(self, idx):
         """
         Return:
-            featurs tensor: tensor[num_shot, D]
-            gt tensor: tensor[num_shot]
+            featurs tensor: tensor[num_shot, D=300]
+            gt tensor: tensor[num_shot, (0,1)]
         """
         return torch.stack(self.features[idx]), self.gts[idx]
 
@@ -119,6 +119,7 @@ class VideoSegDataset(Dataset):
         sentences = [shot["transcript"] for shot in data['features']]
         timestamps = [shot["timestamp"] for shot in data['features']]
 
+        # 300 dim : feature vector
         result = [self.docsim_model.vectorize(sentence) for sentence in sentences]
         vecs = []
         ts = []
@@ -128,6 +129,8 @@ class VideoSegDataset(Dataset):
             if valid:
                 vecs.append(vec)
                 ts.append(t)
+
+        # TODO(OY): encode video features
 
         # Not enough valid vecotors
         if len(vecs) < MIN_SHOTS_NUM:

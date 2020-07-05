@@ -35,6 +35,8 @@ class SeqModel(nn.Module):
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         # self.encoder = nn.Embedding(ntoken, ninp)
         self.ninp = ninp
+
+        # [num_shot, ninput] -> [num_shot, ntoken]
         self.decoder = nn.Linear(ninp, ntoken)
 
         self.init_weights()

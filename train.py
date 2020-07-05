@@ -15,12 +15,26 @@ def train_epoch(model, data_set, optimizer, criterion, epoch, scheduler, start_t
     model.train()
     total_loss = 0
     for i_sample, sample in enumerate(data_set):
+        """
+            x (num_shot=200 ,D=300): [
+                [1.0, 0.2, 1.0....], --> one shot
+                [0.0, .0....]
+                ....
+                (num_shot = 200)
+            ]
+
+            y (num_shot=200) [
+                1, 0, 1, 0....
+            ]
+        """
         x, y = sample
 
         # Hack to mimic batch of 1
         x = x.unsqueeze(1)
 
         optimizer.zero_grad()
+
+        # output.shape = y.shape
         output = model(x)
 
         loss = criterion(output.view(-1, 2), y)
@@ -39,7 +53,7 @@ def train_epoch(model, data_set, optimizer, criterion, epoch, scheduler, start_t
             print('| epoch {:3d} | {:5d}/{:5d} samples | '
                   'lr {:02.2f} | ms/batch {:5.2f} | '
                   'loss {:5.2f} | ppl {:8.2f}'.format(
-                    epoch, i_sample, len(daa_set), scheduler.get_lr()[0],
+                    epoch, i_sample, len(data_set), scheduler.get_lr()[0],
                     elapsed * 1000 / log_interval,
                     cur_loss, math.exp(cur_loss)))
             total_loss = 0

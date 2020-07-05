@@ -14,7 +14,7 @@ from .asr_client import MyClient
 
 
 def transcribeAudio(path_to_audio_file, samplerate=16000):
-    headers = {"Content-type": "audio/wav; codec=\"audio/pcm\"; samplerate=" + str(samplerate)}
+    headers = {"Content-type": "audio/wav; codec=\"audio/pcm\"; samplerate=" + str(samplerate), "Transfer-Encoding": "chunked"}
 
     with open(path_to_audio_file, 'rb') as audio_file:
         response = ""
@@ -64,6 +64,7 @@ def transcribe(audio_chunk):
                 print('trying again', flush=True)
                 time.sleep(0.5)
 
+
 def transcribe_ws(
     audio_chunk, 
     save_adaptation_state = None, 
@@ -81,17 +82,20 @@ def transcribe_ws(
         wf.writeframes(np.frombuffer(audio_chunk, dtype=np.uint8))
         wf.close()
     with open(path, 'r+b') as fp:
-        ws = MyClient(
-            fp, 
-            uri + f'?{urllib.parse.urlencode([("content-type", content_type)])}',
-            ThreadPoolExecutor(),
-            byterate=sample_rate * 2,
-            save_adaptation_state_filename=save_adaptation_state, 
-            send_adaptation_state_filename=send_adaptation_state
-            )
-
-        result = ws.get_full_hyp()
-        return result
+        try:
+            ws = MyClient(
+                fp, 
+                uri + f'?{urllib.parse.urlencode([("content-type", content_type)])}',
+                ThreadPoolExecutor(),
+                byterate=sample_rate * 2,
+                save_adaptation_state_filename=save_adaptation_state, 
+                send_adaptation_state_filename=send_adaptation_state
+                )
+        except Exception as e:
+            print(str)
+        finally:
+            result = ws.get_result()
+            return result
         
 
 

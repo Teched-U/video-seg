@@ -66,7 +66,7 @@ class AudioFeatureExtractor():
 if __name__ == "__main__":
     video_feature_extractor = AudioFeatureExtractor()
     s_t = time.time()
-    # features = video_feature_extractor.get_features(video_path='./data/index.mp4') # Faster but may have bugs
+    features = video_feature_extractor.get_features(video_path='./data/index.mp4') # Faster but may have bugs
     # features = video_feature_extractor.get_features_slow(video_path='./data/index.mp4') # More stable but slower
 
     print(features)

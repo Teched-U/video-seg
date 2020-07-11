@@ -9,3 +9,6 @@ sklearn
 gensim
 ws4py==0.3.2
 pytorch
+moviepy
+openl3
+tensorflow<1.14

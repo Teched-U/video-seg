@@ -53,3 +53,55 @@ class SeqModel(nn.Module):
         output = self.decoder(output)
 
         return output
+
+# Simple merge feature and only one FC
+class VideoSegClassificationModel(nn.Module):
+    def __init__(self, in_dim=768 + 1280, out_dim=2):
+        super(VideoSegClassificationModel, self).__init__()
+        self.fc1 = nn.Linear(in_dim, out_dim)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        return x
+
+## Use FC to merge features
+# class VideoSegClassificationModel(nn.Module):
+#     def __init__(self, in_dim=768+1280, out_dim=2):
+#         super(VideoSegClassificationModel, self).__init__()
+#         self.text_dim = 768
+#         self.video_dim = 1280
+#         hidden_layer_dim = 256
+#
+#         self.fc_audio = nn.Linear(self.text_dim, hidden_layer_dim)
+#         self.fc_video = nn.Linear(self.video_dim, hidden_layer_dim)
+#         self.last_fc = nn.Linear(hidden_layer_dim*2, out_dim)
+#
+#         self.fc1 = nn.Linear(in_dim, out_dim)
+#
+#     def forward(self, x):
+#         audio_x = self.fc_audio(x[:, :, :self.text_dim])
+#         vidio_x = self.fc_video(x[:, :, self.text_dim:])
+#         # vidio_x = torch.relu(vidio_x)
+#         x = torch.cat([audio_x, vidio_x], dim=-1)
+#         x = self.last_fc(x)
+#         return x
+
+# class VideoSegClassificationModel(nn.Module):
+#     def __init__(self, in_dim=768, out_dim=2):
+#         super(VideoSegClassificationModel, self).__init__()
+#
+#
+#         # self.fc1 = nn.Linear(in_dim, out_dim)
+#         self.fc1 = nn.Linear(in_dim, 256)
+#         # self.drop
+#         self.fc2 = nn.Linear(256, 512)
+#         self.fc3 = nn.Linear(512, out_dim)
+#
+#     def forward(self, x):
+#         x = self.fc1(x)
+#         x = torch.relu(x)
+#         x = self.fc2(x)
+#         x = torch.relu(x)
+#         x = self.fc3(x)
+#         return x
+

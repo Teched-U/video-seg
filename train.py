@@ -10,12 +10,15 @@ import torch.nn as nn
 import math
 import random
 import numpy as np
+import os
 
 # In order to reproduce the experiement
 seed = 888
 torch.manual_seed(seed)
 random.seed(seed)
 np.random.seed(seed)
+MODEL_PATH = 'checkpoint'
+if not os.path.exists(MODEL_PATH): os.mkdir(MODEL_PATH)
 
 def train_epoch(model, data_set, optimizer, criterion, epoch, scheduler, start_time)->None:
     model.train()
@@ -67,6 +70,7 @@ def train_epoch(model, data_set, optimizer, criterion, epoch, scheduler, start_t
             total_loss = 0
             start_time = time.time()
 
+
 def evaluate(model :VideoSegClassificationModel, data: VideoSegDataset, criterion):
     model.eval()
     total_loss = 0.
@@ -98,8 +102,9 @@ def evaluate(model :VideoSegClassificationModel, data: VideoSegDataset, criterio
     return total_loss/len(data), total_recall/len(data), total_precision/len(data), total_fscore/len(data)
 
 
-    
-DATA_FOLDER="/home/techedu/video-seg/data/easytopic"
+DATA_ROOT = '/home/techedu'
+# DATA_FOLDER="/home/techedu/video-seg/data/easytopic"
+DATA_FOLDER = "/data/demo_videos_input"
 RESULT_FOLDER="/home/techedu/video-seg/data/easytopic-gt/ground_truths"
 NUM_EPOCH = 100
 
@@ -139,6 +144,7 @@ def train() -> None:
 
     max_precision = 0.0
     max_pre_epoch = 1
+    best_model = None
     for epoch in range(1, epochs + 1):
         # Manual shuffle (Use a dataloader later)
         train_data.shuffle()
@@ -151,6 +157,8 @@ def train() -> None:
         if precision > max_precision:
             max_precision = precision
             max_pre_epoch = epoch
+            # Save the best model
+            torch.save(model.state_dict(), os.path.join(MODEL_PATH, f'best_model.pd'))
         print('-' * 89)
         print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
               'valid ppl {:8.2f} | recall: {:5.2f} | precision: {:5.5f} | fscore: {:5.2f}'.format(epoch, (time.time() - epoch_start_time),
@@ -158,6 +166,8 @@ def train() -> None:
         print('-' * 89)
     
         scheduler.step()
+        if epoch % 2 == 0:
+            torch.save(model.state_dict(), os.path.join(MODEL_PATH, f'model_epoch{epoch}.pd'))
 
     print('max_precision, epoch:', max_precision, max_pre_epoch)
 

@@ -178,7 +178,18 @@ class VideoSegPrediction():
                 video_feature = torch.stack(video_feature)
             input = torch.cat([torch.stack(asr_feature), video_feature], dim=1)
             res = self.model(input)
-            res = torch.argmax(res, axis=1).numpy()
+
+            res_npy = res.detach().numpy()
+            res = []
+            for r in res_npy:
+                if r[1] > 0.5:
+                    res += [1]
+                else:
+                    res += [0]
+            res = np.array(res)
+            # res = torch.argmax(res, axis=1).numpy()
+
+            # Threshold low probability
 
             # import ipdb; ipdb.set_trace()
             target_idx = np.argwhere(res == 1)
@@ -200,9 +211,10 @@ class VideoSegPrediction():
 
 
 if __name__ == "__main__":
-    video_model = VideoSegPrediction('./checkpoint/model_epoch68.pd')
-    res = video_model.test_one_video('/data/easytopic-data/2PhaT6AbH3Q/2PhaT6AbH3Q.mp4')
-    # res = video_model.test_one_video('/data/demo_videos/operating_system_demo_video1.mp4')
+    video_model = VideoSegPrediction('/data/Exp/test-dev-video-seg/checkpoint/best_model.pd')
+    # video_model = VideoSegPrediction()
+    # res = video_model.test_one_video('/data/easytopic-data/2PhaT6AbH3Q/2PhaT6AbH3Q.mp4')
+    res = video_model.test_one_video('/data/demo_videos/operating_system_demo_video1.mp4')
     print(res)
     print("Shape:", np.shape(res))
 

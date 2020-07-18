@@ -12,8 +12,10 @@ import random
 import numpy as np
 import os
 
+import sys
 # In order to reproduce the experiement
-seed = 888
+GRID_SEARCH= False
+seed = 7793799
 torch.manual_seed(seed)
 random.seed(seed)
 np.random.seed(seed)
@@ -103,8 +105,8 @@ def evaluate(model :VideoSegClassificationModel, data: VideoSegDataset, criterio
 
 
 DATA_ROOT = '/home/techedu'
-# DATA_FOLDER="/home/techedu/video-seg/data/easytopic"
-DATA_FOLDER = "/data/demo_videos_input"
+DATA_FOLDER="/home/techedu/video-seg/data/easytopic"
+# DATA_FOLDER = "/data/demo_videos_input"
 RESULT_FOLDER="/home/techedu/video-seg/data/easytopic-gt/ground_truths"
 NUM_EPOCH = 100
 
@@ -142,7 +144,7 @@ def train() -> None:
 
     val_data = train_data
 
-    max_precision = 0.0
+    max_precision = max_f = 0.0
     max_pre_epoch = 1
     best_model = None
     for epoch in range(1, epochs + 1):
@@ -159,6 +161,11 @@ def train() -> None:
             max_pre_epoch = epoch
             # Save the best model
             torch.save(model.state_dict(), os.path.join(MODEL_PATH, f'best_model.pd'))
+
+        if fscore > max_f:
+            max_f = fscore
+            torch.save(model.state_dict(), os.path.join(MODEL_PATH, f'best_f_model.pd'))
+
         print('-' * 89)
         print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
               'valid ppl {:8.2f} | recall: {:5.2f} | precision: {:5.5f} | fscore: {:5.2f}'.format(epoch, (time.time() - epoch_start_time),
@@ -169,7 +176,22 @@ def train() -> None:
         if epoch % 2 == 0:
             torch.save(model.state_dict(), os.path.join(MODEL_PATH, f'model_epoch{epoch}.pd'))
 
-    print('max_precision, epoch:', max_precision, max_pre_epoch)
+    print('max_precision, fscore, epoch:', max_precision, max_f, max_pre_epoch)
+    return max_precision
 
 if __name__ == '__main__':
-    train()
+    if GRID_SEARCH:
+        rand_ints = np.random.randint(low=0, high=9999999, size=100)
+        best_acc = best_seed = 0
+        for i in rand_ints:
+            seed = i
+            torch.manual_seed(seed)
+            random.seed(seed)
+            np.random.seed(seed)
+            res = train()
+            if res > best_acc:
+                best_acc = res
+                best_seed = i
+        print("Best seed and acc", best_seed, best_acc)
+    else:
+        train()

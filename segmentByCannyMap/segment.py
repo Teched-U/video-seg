@@ -1,78 +1,64 @@
-import numpy as np
 import cv2
-import time
-from ccl import *
-from matplotlib import pyplot as plt
+import numpy as np
+import pytesseract
+from pytesseract import Output
 
-
-def get_Canny(pathIn):
-  # Canny maps
-  frames = []
-  # imgs
-  imgs = []
-  vid_cap = cv2.VideoCapture(pathIn)
-        
-  if vid_cap.isOpened():
-    # get rate
-    rate=vid_cap.get(5)
-    # get frame number
-    FrameNumber=vid_cap.get(7)
-    duration=FrameNumber/rate
-    # get duration
-    print(duration)
-  success, image = vid_cap.read()
-  count = 0
-  while success:
-    temp = vid_cap.get(0)
-    cv2.imwrite("/Users/yizhizhang/Downloads/test_frames/" + str(count) + ".jpg", image)  # save frame as JPEG file
+#  Text Segmentation
+def detect_paragraph(image):
+    # img: grayscale
+    # Load image, grayscale, Gaussian blur, Otsu's threshold
+    # image = cv2.imread(path)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    canny = cv2.Canny(gray,50,150)
-    frames.append(canny)
-    imgs.append(image)
-    count += 1
-    vid_cap.set(cv2.CAP_PROP_POS_MSEC, 1 * 1000 * count)
-    success, image = vid_cap.read()
-    if temp == vid_cap.get(0):
-      print("loop ends")
-      break
-    print('Total frames: ', count)
+    blur = cv2.GaussianBlur(gray, (5,5), 0)
+    thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
 
-  # When everything done, release the capture
-  vid_cap.release()
-  cv2.destroyAllWindows()
-  return frames, duration, imgs
+    # Create rectangular structuring element and dilate
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (6,6))
+    dilate = cv2.dilate(thresh, kernel, iterations=10)
 
-def get_Differential(frames):
-  differentials = []
-  for i in range(1,len(frames)):
-    differentials.append(frames[i] - frames[i-1])
-  return differentials
+    # Find contours and draw rectangle
+    cnts = cv2.findContours(dilate, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+    
+    for c in cnts:
+        x,y,w,h = cv2.boundingRect(c)
+        cv2.rectangle(image, (x, y), (x + w, y + h), (36,255,12), 2)
+    
+    #cv2.imshow('thresh', thresh)
+    #cv2.imshow('dilate', dilate)
+    cv2.namedWindow('image', cv2.WINDOW_NORMAL)
+    cv2.resizeWindow('image', 600, 600)
+    cv2.imshow('image', image)
 
-def main(pathin):
-  #pathin = "/Users/yizhizhang/Downloads/test.mp4"
-  frames, duration, imgs = get_Canny(pathin)
-  differentials = get_Differential(frames)
-  CCs = []
-  for differential in differentials:
-    #change to bool image
-    arr = np.asarray(differential)
-    arr = arr != 255
-    # CC Analysis
-    result = connected_component_labelling(arr, 4)
-    CCs.append(np.max(result))
-    print(np.max(result))
-  # Threshold processing (20)
-  CCs = np.array(CCs)
-  tmp = np.where(CCs >20)
-  # Time stamps of key_frames after first segmentation
-  index = tmp[0] + 1
-  # Get key_frames (first step)
-  key_frames = imgs[index]
+    cv2.waitKey()
+    return cnts
+
+def crop_image(im, rect, scale):
+    xmin, ymin, xmax, ymax = rect
+    cropped = im[ymin:ymax, xmin:xmax]
+    return cropped
+
+def contours_text(orig, contours):
+    for cnt in contours: 
+        x, y, w, h = cv2.boundingRect(cnt)
 
 
+        # Cropping the text block for giving input to OCR 
+        cropped = orig[y:y + h, x:x + w] 
+        print(y, x)
+
+        # Apply OCR on the cropped image 
+        config = ('-l eng --oem 1 --psm 3')
+        text = pytesseract.image_to_string(cropped, config=config) 
+        data = pytesseract.image_to_data(cropped, config = config)
 
 
+        print(text)
+        print(data)
+        print()
 
+#image = cv2.imread("/Users/yizhizhang/Downloads/test_frames/46.jpg")
+image = cv2.imread("/Users/yizhizhang/Desktop/andrew.png")
+cnts = detect_paragraph(image)
+contours_text(image, cnts)
 
-
-if __name__ == "__main__": main()

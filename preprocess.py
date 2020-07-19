@@ -211,29 +211,38 @@ def process_video(video_file: str) -> Dict:
     #     feature_arr.append(feature)
 
     # return {"features": feature_arr, "video_name": video_file}
-def google_transcribe(video_paths, output_dir):
+def google_transcribe(video_paths):
+    """
+    Input: 
+        video_paths: List[path]
+    Return:
+        data_list: List[Dict]
+    """
+    data_list = []
     for video_path in video_paths:
         data = {}
-        save_path = os.path.join(output_dir, os.path.basename(video_path))
-        click.secho(f"saving to {save_path}", fg="red")
-
-        with open(save_path, "wb") as f:
-            try:
-                data = process_video(video_path)
-                
-            except Exception as e:
-                print(f"Error: {e}")
-                continue
+        click.secho(f"processing {video_path}", fg="red")
+        try:
+            data = process_video(video_path)
             
-            data = {
-                "results": data,
-                "video_name": video_path
-            }
+        except Exception as e:
+            print(f"Error: {e}")
+            continue
+        
+        all_transcript = [alter.transcript for alter in data]
+        all_transcript = '\n'.join(all_transcript)
 
-            pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+        data_list.append({
+            "results": data,
+            "video_name": video_path,
+            "all_transcript": all_transcript
+        })
 
 
-def combine_asr(result_paths: List[str]):
+    return data_list
+
+
+def combine_asr(data_list: List[Dict], output_paths: List[str]) -> List[Dict]:
     """
     input: [{
         "transcript": ...,
@@ -261,15 +270,8 @@ def combine_asr(result_paths: List[str]):
         video_name: <path to video>
     }
     """
-    for result_path in result_paths:
-        data = {}
-        with open(result_path, 'rb') as f:
-            data = pickle.load(f)
-
-
-        if not data :
-            click.secho(f"No data at {result_path}", fg="red")
-
+    log_result_list = []
+    for data, output_path in zip(data_list, output_paths):
         result = data["results"]
         video_path = data["video_name"]
 
@@ -291,14 +293,24 @@ def combine_asr(result_paths: List[str]):
             ]
             segments.append(segment)
         
-        video_name = Path(os.path.basename(result_path)).stem
         # Save it 
-        with open(os.path.join('/home/techedu/video-seg/data/easytopic-v3', video_name), 'wb') as f:
+        with open(output_path, 'wb') as f:
             data = {
                 "features": segments, 
                 "video_name": video_path
             }
             pickle.dump(data,f, pickle.HIGHEST_PROTOCOL)
+
+        # Output for log result
+        duration_list = [seg['duration'] for seg in segments]
+        avg_seg_dur = np.mean(np.array(duration_list))
+        log_result = {
+            "num_segs": len(segments),
+            "avg_seg_dur": avg_seg_dur
+        }
+        log_result_list.append(log_result)
+
+    return log_result_list
 
 
 def process_video_easy(video_file: str, version: str) -> Dict:

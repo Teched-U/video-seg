@@ -244,8 +244,8 @@ def google_transcribe(video_paths, output_paths):
 
         # Output to a json file if chosen
         if output_path:
-            with open(output_path, 'w') as f:
-                json.dump(result, f)
+            with open(output_path, 'wb') as f:
+                pickle.dump(result, f, pickle.HIGHEST_PROTOCOL)
 
 
     return data_list

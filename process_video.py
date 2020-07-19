@@ -179,11 +179,11 @@ def main(video_name, video_dir, result_dir, asr_load_path, asr_save_path):
         `python process_video.py foo.mp4 --video-dir /data/videos`
 
     Process '/data/videos/foo.mp4' and save its Google ASR result:\n
-        `python process_video.py foo.mp4 --video-dir /data/videos --asr_save_path /path/to/save 
+        `python process_video.py foo.mp4 --video-dir /data/videos --asr_save /tmp/foo.data` 
     
 
     Process video and load ASR result:\n
-        `python process_video.py foo.mp4 --video-dir /data/videos --asr_load_path /path/to/load`
+        `python process_video.py foo.mp4 --video-dir /data/videos --asr_load /tmp/foo.data`
 
     Processed output will be in '/data/results' unless you override it with '--result-dir'
 
@@ -205,8 +205,8 @@ def main(video_name, video_dir, result_dir, asr_load_path, asr_save_path):
     # Send Google ASR
     video_path = path.join(VIDEO_DIR, video_name)
     if asr_load_path:
-        with open(asr_load_path, 'r') as f:
-            result = json.load(f)
+        with open(asr_load_path, 'rb') as f:
+            result = pickle.load(f)
     else:
         result = google_transcribe([video_path], [asr_save_path])[0]
 

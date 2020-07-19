@@ -211,15 +211,18 @@ def process_video(video_file: str) -> Dict:
     #     feature_arr.append(feature)
 
     # return {"features": feature_arr, "video_name": video_file}
-def google_transcribe(video_paths):
+def google_transcribe(video_paths, output_paths):
     """
     Input: 
-        video_paths: List[path]
+        video_paths: List[path],
+        output_paths: List[path], 
+            Optional files to store the result (to prevent multiple runs).
+            Use None to indicate not saving
     Return:
         data_list: List[Dict]
     """
     data_list = []
-    for video_path in video_paths:
+    for video_path, output_path in zip(video_paths, output_paths):
         data = {}
         click.secho(f"processing {video_path}", fg="red")
         try:
@@ -232,11 +235,17 @@ def google_transcribe(video_paths):
         all_transcript = [alter.transcript for alter in data]
         all_transcript = '\n'.join(all_transcript)
 
-        data_list.append({
+        result = {
             "results": data,
             "video_name": video_path,
             "all_transcript": all_transcript
-        })
+        }
+        data_list.append(result)
+
+        # Output to a json file if chosen
+        if output_path:
+            with open(output_path, 'w') as f:
+                json.dump(result, f)
 
 
     return data_list

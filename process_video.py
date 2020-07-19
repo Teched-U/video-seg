@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import json
 import os 
 import os.path as path
@@ -8,6 +10,7 @@ import tempfile
 import cv2
 import pickle
 from pathlib import Path
+import click
 
 
 class ResultJson:
@@ -141,16 +144,72 @@ def write_result(video_path, data):
         json.dump(data, f)
 
 
-if __name__ == '__main__':
+@click.command()
+@click.argument(
+    'video_name'
+)
+@click.option(
+    '--video-dir',
+    "video_dir",
+)
+@click.option(
+    '--asr-load',
+    "asr_load_path",
+    type=str,
+    help='Absolute file path to LOAD the google ASR result'
+)
+@click.option(
+    '--result-dir',
+    'result_dir',
+    type=str,
+    help='Where results are saved in the end'
+)
+@click.option(
+    '--asr-save',
+    "asr_save_path",
+    type=str,
+    help='Absolute file path to SAVE the google ASR result '
+)
+def main(video_name, video_dir, result_dir, asr_load_path, asr_save_path):
+    """
+    Use this to segments a video.
 
-    video_name = sys.argv[1]
+    Example: \n
+    Process '/data/videos/foo.mp4':\n
+        `python process_video.py foo.mp4 --video-dir /data/videos`
+
+    Process '/data/videos/foo.mp4' and save its Google ASR result:\n
+        `python process_video.py foo.mp4 --video-dir /data/videos --asr_save_path /path/to/save 
+    
+
+    Process video and load ASR result:\n
+        `python process_video.py foo.mp4 --video-dir /data/videos --asr_load_path /path/to/load`
+
+    Processed output will be in '/data/results' unless you override it with '--result-dir'
+
+    Model features are stored in : '/data/features'
+
+    """
+
+    if video_dir:
+        global VIDEO_DIR
+        VIDEO_DIR = video_dir
+    
+    if result_dir:
+        global RESULT_DIR
+        RESULT_DIR = result_dir
 
     # Start the process
     write_result(video_name, ResultJson.start())
 
     # Send Google ASR
     video_path = path.join(VIDEO_DIR, video_name)
-    result = google_transcribe([video_path])[0]
+    if asr_load_path:
+        with open(asr_load_path, 'r') as f:
+            result = json.load(f)
+    else:
+        result = google_transcribe([video_path], [asr_save_path])[0]
+
     write_result(video_name, ResultJson.asr_done(result))
 
     #  Combine ASR for Shots 
@@ -166,4 +225,5 @@ if __name__ == '__main__':
     write_result(video_name, ResultJson.story_done(story_list))
 
 
-
+if __name__ == '__main__':
+    main()

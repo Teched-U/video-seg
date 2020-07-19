@@ -5,7 +5,10 @@ import torch
 # Threshold of 10 seconds to consider match
 THRESHOLD = 10
 
-def evaluate_metrics(predicted: torch.Tensor, ts : List[float], gt : Dict) -> Tuple[float, float, float]: 
+
+def evaluate_metrics(
+    predicted: torch.Tensor, ts: List[float], gt: Dict
+) -> Tuple[float, float, float]:
     """
     Format of the gt and  pred
     {
@@ -21,8 +24,6 @@ def evaluate_metrics(predicted: torch.Tensor, ts : List[float], gt : Dict) -> Tu
     predicted = list(predicted)
     pred_ts_arr = sorted(list([t for t, pred in zip(ts, predicted) if pred > 0]))
 
-
-
     # Calculate number of hits: overlapping starting point
     gt_ts_arr = sorted(map(int, gt.keys()))
 
@@ -34,13 +35,11 @@ def evaluate_metrics(predicted: torch.Tensor, ts : List[float], gt : Dict) -> Tu
                 hits += 1
                 break
 
+    precision = 0.0 if len(pred_ts_arr) == 0 else float(hits / len(pred_ts_arr))
+    recall = float(hits / len(gt_ts_arr))
 
-    precision = 0. if len(pred_ts_arr) == 0 else float(hits/len(pred_ts_arr)) 
-    recall = float(hits/len(gt_ts_arr))
-    
     if precision > 0 or recall > 0:
-	    fscore = 2* float((precision * recall) / (precision + recall))
+        fscore = 2 * float((precision * recall) / (precision + recall))
     else:
-	    fscore = 0
+        fscore = 0
     return recall, precision, fscore
-

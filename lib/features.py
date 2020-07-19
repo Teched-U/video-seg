@@ -10,12 +10,13 @@ import tempfile
 import traceback
 import contextlib
 
+
 def read_wave(path):
     """Reads a .wav file.
     Takes the path, and returns (PCM audio data, sample rate).
     """
     try:
-        with contextlib.closing(wave.open(path, 'rb')) as wf:
+        with contextlib.closing(wave.open(path, "rb")) as wf:
             num_channels = wf.getnchannels()
             assert num_channels == 1
             sample_width = wf.getsampwidth()
@@ -26,6 +27,7 @@ def read_wave(path):
             return pcm_data, sample_rate
     except Exception as e:
         print(e, flush=True)
+
 
 def pitch_estimation(filename, sample_rate):
 
@@ -58,17 +60,21 @@ def pitch_estimation(filename, sample_rate):
         ste += [shortTermEnergy(samples)]
         confidences += [confidence]
         total_frames += read
-        if read < hop_s: break
+        if read < hop_s:
+            break
 
-    if 0: sys.exit(0)
+    if 0:
+        sys.exit(0)
     pitches = [p for p in pitches if p != 0]
     return np.mean(pitches), np.mean(ste)
+
 
 def shortTermEnergy(frame):
     return sum([abs(x) ** 2 for x in frame]) / len(frame)
     # plt.savefig(os.path.basename(filename) + '.svg')
 
-'''def getVideoLength(self):
+
+"""def getVideoLength(self):
     video_file = self.video_path.split("/")[-2]+".mp4"
     self.video_file = video_file
     print(video_file)
@@ -83,40 +89,45 @@ def shortTermEnergy(frame):
     length_seconds += float(aux[0]) *3600
     length_seconds += float(aux[1]) * 60
     length_seconds += float(aux[2])
-    self.video_length = length_seconds'''
+    self.video_length = length_seconds"""
 
-'''extract pause duration before being voiced of every audio chunk'''
+"""extract pause duration before being voiced of every audio chunk"""
+
+
 def extractPauseDuration(self):
     file_path = self.video_path + "seg.txt"
-    file = open(file_path, 'r')
+    file = open(file_path, "r")
     f = file.read()
     times = []
     timesEnd = []
     pause_list = []
-    l = re.findall("\+\(\d*\.\d*\)",f )
+    l = re.findall("\+\(\d*\.\d*\)", f)
     for i in l:
-        i = i.replace("+","")
-        i = i.replace("(","")
-        i = i.replace(")","")
+        i = i.replace("+", "")
+        i = i.replace("(", "")
+        i = i.replace(")", "")
         times.append(float(i))
 
-    l = re.findall("\-\(\d*\.\d*\)",f )
+    l = re.findall("\-\(\d*\.\d*\)", f)
     for i in l:
-        i = i.replace("-","")
-        i = i.replace("(","")
-        i = i.replace(")","")
+        i = i.replace("-", "")
+        i = i.replace("(", "")
+        i = i.replace(")", "")
         timesEnd.append(float(i))
     file.close()
     pause_list.append(times[0])
     for i in range(1, len(timesEnd)):
-        pause_list.append(float(times[i] - timesEnd[i-1]))
+        pause_list.append(float(times[i] - timesEnd[i - 1]))
 
     return pause_list, times, timesEnd
 
-'''Extract the pitch and volume estimation of each audio chunk'''
+
+"""Extract the pitch and volume estimation of each audio chunk"""
+
+
 def extract_emphasis(file, sample_rate):
 
-    #larm = es.DynamicComplexity(sampleRate=fs)
+    # larm = es.DynamicComplexity(sampleRate=fs)
 
     pitch, energy = pitch_estimation(file, sample_rate)
 
@@ -124,10 +135,10 @@ def extract_emphasis(file, sample_rate):
 
 
 def extract_features(audio_chunk):
-    with tempfile.NamedTemporaryFile(mode='w+b', suffix='.wav') as fp:
+    with tempfile.NamedTemporaryFile(mode="w+b", suffix=".wav") as fp:
         try:
             sample_rate = 16000
-            wf = wave.open(fp, 'w')
+            wf = wave.open(fp, "w")
             wf.setnchannels(1)
             wf.setsampwidth(2)
             wf.setframerate(sample_rate)
@@ -135,7 +146,10 @@ def extract_features(audio_chunk):
             wf.close()
 
             pitch, energy = extract_emphasis(fp.name, sample_rate)
-            return pitch if not np.isnan(pitch) else 0, energy if not np.isnan(energy) else 0
+            return (
+                pitch if not np.isnan(pitch) else 0,
+                energy if not np.isnan(energy) else 0,
+            )
 
         except Exception as e:
             print(traceback.format_exc(), flush=True)

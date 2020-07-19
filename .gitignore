@@ -1,3 +1,5 @@
 **/__pycache__
 **.log
 **/tmp
+.ipynb_checkpoints
+.vscode/

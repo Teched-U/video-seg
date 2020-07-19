@@ -10,3 +10,6 @@ gensim
 ws4py==0.3.2
 torch
 opencv-python
+moviepy
+openl3
+tensorflow<1.14

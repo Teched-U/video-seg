@@ -7,6 +7,7 @@ import subprocess
 import time
 import json
 import os
+from lib.asr_google import upload_blob
 
 app = Flask(__name__)
 CORS(app)
@@ -21,26 +22,13 @@ def hello_world():
 def start_process(video_path):
         if 'requests' not in g:
                 g.requests = {}
-
+        
         cmd = f"python process_video.py {video_path}"
         proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
-        
-        # print(f"here {cmd}")
-        # Wait here 
-        # try:
-        #         outs, errs = proc.communicate(timeout=5)
-        # except subprocess.TimeoutExpired:
-        #         proc.kill()
-        #         outs, errs = proc.communicate()
-        # print(outs)
-        # print(errs)
-
-
-
         g.requests[video_path] = proc
 
 
-        
+CDN_URL = 'http://35.244.161.66/'
 
 @app.route('/upload', methods=['GET','POST'])
 def upload():
@@ -51,7 +39,10 @@ def upload():
                 # Async start a routine
                 start_process(f.filename)
 
-                return {'path': f.filename}
+                # Upload to GC
+                upload_blob('techedu-video-upload', save_path, f.filename)
+
+                return {'path': f.filename, 'video_url': CDN_URL+f.filename}
         else:
                 return 'GET OK' 
 
@@ -59,10 +50,6 @@ def upload():
 def cancel(video_id):
         return f'Cancel {video_id}'
 
-
-@socketio.on('message')
-def handle_message(message):
-    print('received message: ' + message)
 
 @socketio.on('analysis')
 def get_process_stats(video_name):

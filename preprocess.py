@@ -36,21 +36,30 @@ def get_canny(video: cv2.VideoCapture, cur_frame_ms: float):
 
 
 def check_similarity(
-    video: cv2.VideoCapture, cur_ts: float, cur_dur: float, next_ts: float
+    video: cv2.VideoCapture, cur_ts: float, cur_dur: float, next_ts: float, next_dur: float
 ) -> bool:
 
-    if cur_dur < 1:
+    # buffer window of 5 seconds 
+    WINDOW_LEN = 5
+    if cur_dur < WINDOW_LEN:
         print(f"shot duration only {cur_dur}")
         cur_frame_ms = cur_ts * 1000
     else:
-        cur_frame_ms = (cur_ts + cur_dur - 1.0) * 1000
+        cur_frame_ms = (cur_ts + cur_dur - WINDOW_LEN) * 1000
 
     prev_canny = get_canny(video, cur_frame_ms)
 
-    cur_frame_ms = next_ts * 1000
-    next_canny = get_canny(video, cur_frame_ms)
+    if next_dur < WINDOW_LEN:
+        cur_frame_ms = (next_ts + next_dur) * 1000
+    else:
+        cur_frame_ms = (next_ts + WINDOW_LEN) * 1000
 
-    diff = next_canny - prev_canny
+    next_canny = get_canny(video, cur_frame_ms)
+    try:
+        diff = next_canny - prev_canny
+    except ValueError as e:
+        click.secho(str(e), fg="red")
+        return False
 
     # change to bool image
     arr = np.asarray(diff)
@@ -69,7 +78,9 @@ def merge_segments(a: Dict, b: Dict) -> Dict:
         f"merging shots {a['timestamp']}({a['duration']}) <= {b['timestamp']}({b['duration']}"
     )
     a["duration"] = b["timestamp"] - a["timestamp"] + b["duration"]
-    a["bytes"] = b"".join([a["bytes"], b["bytes"]])
+    a["words"] += b["words"] 
+    a["transcript"] = a["transcript"] + "\n" + b["transcript"]
+
     return a
 
 
@@ -87,16 +98,22 @@ def merge(video_file: str, segments: List[Dict]) -> List[Dict]:
     merged_segments = []
     # Start merging
 
+    duration = [seg['duration'] for seg in segments]
+    duration = np.array(duration)
+    click.secho(f'[{video_file}]BEFORE: Duration - [mean: {np.mean(duration)}, max: {np.max(duration)}, min: {np.min(duration)}')
+    click.secho(f'Number of segs: {len(segments)}')
+    start = time.time()
+
     i  = 1
     while i < len(segments):
         cur_ts = cur_seg["timestamp"]
-        next_seg = segments[i]
+        next_seg = segments[i] 
 
         # If duration of previous segment already long
-        while next_seg["timestamp"] - cur_ts <= 7:
+        while next_seg["timestamp"] - cur_ts <= 30:
             # A short segment, see if it has the identical visual content with the next one
             to_merge = check_similarity(
-                vid_cap, cur_ts, cur_seg["duration"], next_seg["timestamp"]
+                vid_cap, cur_ts, cur_seg["duration"], next_seg["timestamp"], next_seg['duration']
             )
             
             if to_merge:
@@ -113,15 +130,33 @@ def merge(video_file: str, segments: List[Dict]) -> List[Dict]:
             else:
                 # already last break
                 break
-            
+        
+        if cur_seg['duration'] < 5:
+            click.secho(f"Duration={cur_seg['duration']}, i={i}, video: {video_file}", fg="red")
         merged_segments.append(cur_seg)
         cur_seg = next_seg
+
+        if i == len(segments) -1:
+            if cur_seg['duration'] < 5:
+                click.secho(f"Duration={cur_seg['duration']}, i={i}, video: {video_file}", fg="red")
+            # Last segment
+            merged_segments.append(cur_seg)
+
         i+=1
+
+    
+    duration = [seg['duration'] for seg in merged_segments]
+    duration = np.array(duration)
+    click.secho(f'[{video_file}]BEFORE: Duration - [mean: {np.mean(duration)}, max: {np.max(duration)}, min: {np.min(duration)}')
+    click.secho(f'Number of segs: {len(merged_segments)}')
+    elapsed = time.time() - start
+    click.secho(f'Time: {elapsed}')
 
     return merged_segments
 
 
-#def split_segment(video, ts, dur) -> List[Dict]:
+def split_segment(video, ts, dur) -> List[Dict]:
+    pass
     
 
 def split_by_video(video_file: str, segments: List[Dict]) -> List[Dict]:
@@ -145,6 +180,35 @@ def split_by_video(video_file: str, segments: List[Dict]) -> List[Dict]:
 
     return split_segs
 
+
+def image_merge_preprocess(result_files: List[str], save_paths: str) -> List[Dict]:
+    results = []
+    for input_file, save_path in zip(result_files, save_paths):
+        with open(input_file, 'rb') as fp:
+            data = pickle.load(fp)
+
+        # Try merge the segments
+        video_path = data['video_name']
+        segs = data['features']
+
+        merged_segs = merge(video_path, segs)
+
+        durations = [seg['duration'] for seg in merged_segs]
+        durations = np.array(durations)
+
+        with open(save_path, 'wb') as fp:
+            data = {
+                'video_name': video_path,
+                'features': merged_segs 
+            }
+            pickle.dump(data, fp, pickle.HIGHEST_PROTOCOL)
+
+        results.append({
+            'num_segs': len(merged_segs),
+            'avg_seg_dur': np.mean(durations)
+        })
+
+    return results
 
 
 def process_video(video_file: str) -> Dict:
@@ -368,7 +432,7 @@ def process_video_easy(video_file: str, version: str) -> Dict:
 @click.option("-i", "--input-path", type=str, help="ABSOLUTE path to video folders")
 @click.option("-s", "source", default="easytopic", type=str, help="Data souce")
 @click.option("-o", "output_dir", type=str, help="Where to save the transcripts")
-@click.option("--cmd", "cmd", type=click.Choice(["asr_google", "post_proc", "videos", "coursera"]), help="Command")
+@click.option("--cmd", "cmd", type=click.Choice(["asr_google", "post_proc", "videos", "coursera", "merge"]), help="Command")
 @click.option("-v", "videos", multiple=True, help="videos to process")
 def main(input_path: str, source: str, output_dir: str, cmd: str, videos:List[str]) -> None:
     if cmd == "asr_google":
@@ -393,6 +457,22 @@ def main(input_path: str, source: str, output_dir: str, cmd: str, videos:List[st
         output_files = next(os.walk(output_dir))[2]
         output_files = [os.path.join(output_dir, p) for p in output_files]
         combine_asr(output_files)
+    elif cmd == "merge":
+        result_dir = input_path
+        result_files = videos
+        if result_dir:
+            result_files = glob.glob(f"{result_dir}/*.json")
+            print(result_files)
+
+        save_paths = []
+        for input_file in result_files:
+            file_name = os.path.basename(input_file)
+            save_path = os.path.join(output_dir, file_name)
+            save_paths.append(save_path)
+
+        image_merge_preprocess(result_files, save_paths)
+        
+
 
 
 

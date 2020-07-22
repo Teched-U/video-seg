@@ -4,7 +4,8 @@ import json
 import os 
 import os.path as path
 import sys
-from preprocess import google_transcribe , combine_asr
+from preprocess import google_transcribe , combine_asr, image_merge_preprocess
+from lib.asr_google import upload_blob
 from run_model import run_model
 import tempfile
 import cv2
@@ -43,6 +44,14 @@ class ResultJson:
             "story_list": story_list
         }
 
+    def merge_done(result):
+        return {
+            "state": "基于图片整合片段完成",
+            "done": False,
+            "num_segs": result["num_segs"],
+            "avg_seg_dur": result["avg_seg_dur"]
+        }
+
 RESULT_DIR = '/data/results/'
 VIDEO_DIR ='/data/upload/'
 THUMBNAIL_DIR = '/data/thumbnails/'
@@ -74,13 +83,22 @@ class Story:
             'thumbnail': self.thumbnail
         }
 
-    def extract_thumbnail(self, video, img_dir):
+    def extract_thumbnail(self, video, img_dir, video_name):
         video.set(cv2.CAP_PROP_POS_MSEC, 1000 * self.timestamp)
         success, image = video.read()
         if success:
-            thumbnail_path = os.path.join(img_dir, f'{str(int(self.timestamp*1000))}.jpg')
+            pic_name = f'{str(int(self.timestamp*1000))}.jpg'
+            thumbnail_path = os.path.join(img_dir, pic_name)
             cv2.imwrite(thumbnail_path, image)
-            self.thumbnail = thumbnail_path
+            # Upload to Google Cloud Storage
+            dest_path = os.path.join('thumbnails', video_name, pic_name)
+            upload_blob(
+                'techedu-video-upload', 
+                thumbnail_path, 
+                dest_path
+                )
+            self.thumbnail = 'http://35.244.161.66/'+dest_path
+            print(f'Saved to {self.thumbnail}')
         else:
             print(f"ERROR EXTRACTING {img_dir} at {self.timestamp}")
         
@@ -128,7 +146,7 @@ def aggregate_results(seg_result, input_file):
     vid_cap = cv2.VideoCapture(video_path)
     if vid_cap.isOpened():
         for story in story_list:
-            story.extract_thumbnail(vid_cap, thumb_dir)
+            story.extract_thumbnail(vid_cap, thumb_dir, video_name)
 
     story_list = [story.to_dict() for story in story_list]
 
@@ -143,6 +161,48 @@ def write_result(video_path, data):
     with open(save_path, 'w') as f:
         json.dump(data, f)
 
+def run(video_name, video_dir=None, result_dir=None, asr_load_path=None, asr_save_path=None, input_dir=None):
+    video_name_no_suffix = video_name.split('.')[0]
+
+    if video_dir:
+        global VIDEO_DIR
+        VIDEO_DIR = video_dir
+    
+    if result_dir:
+        global RESULT_DIR
+        RESULT_DIR = result_dir
+
+    # Start the process
+    write_result(video_name, ResultJson.start())
+
+    # Send Google ASR
+    video_path = path.join(VIDEO_DIR, video_name)
+    if asr_load_path:
+        with open(asr_load_path, 'rb') as f:
+            result = pickle.load(f)
+    else:
+        result = google_transcribe([video_path], [asr_save_path])[0]
+
+    write_result(video_name, ResultJson.asr_done(result))
+
+    #  Combine ASR for Shots 
+    if input_dir:
+        model_input_file = os.path.join(input_dir, f'{video_name_no_suffix}.json')
+    else:
+        fd, model_input_file = tempfile.mkstemp()
+    result = combine_asr([result], [model_input_file])[0]
+    write_result(video_name, ResultJson.shot_done(result))
+
+    # Mege ASR results based on image signal
+    result = image_merge_preprocess([model_input_file], [model_input_file])[0]
+    write_result(video_name, ResultJson.merge_done(result))
+
+    # Run Sequence Model  
+    seg_result = run_model(video_path, model_input_file, FEATURE_DIR)
+
+    # Aggregate Final results 
+    story_list = aggregate_results(seg_result, model_input_file)    
+    write_result(video_name, ResultJson.story_done(story_list))
 
 @click.command()
 @click.argument(
@@ -170,7 +230,13 @@ def write_result(video_path, data):
     type=str,
     help='Absolute file path to SAVE the google ASR result '
 )
-def main(video_name, video_dir, result_dir, asr_load_path, asr_save_path):
+@click.option(
+    "--model-input-dir",
+    "input_dir",
+    type=str,
+    help="Where to save the inputs for Model"
+)
+def main(video_name, video_dir, result_dir, asr_load_path, asr_save_path, input_dir):
     """
     Use this to segments a video.
 
@@ -190,39 +256,9 @@ def main(video_name, video_dir, result_dir, asr_load_path, asr_save_path):
     Model features are stored in : '/data/features'
 
     """
+    run(video_name, video_dir, result_dir, asr_load_path, asr_save_path, input_dir)
 
-    if video_dir:
-        global VIDEO_DIR
-        VIDEO_DIR = video_dir
-    
-    if result_dir:
-        global RESULT_DIR
-        RESULT_DIR = result_dir
 
-    # Start the process
-    write_result(video_name, ResultJson.start())
-
-    # Send Google ASR
-    video_path = path.join(VIDEO_DIR, video_name)
-    if asr_load_path:
-        with open(asr_load_path, 'rb') as f:
-            result = pickle.load(f)
-    else:
-        result = google_transcribe([video_path], [asr_save_path])[0]
-
-    write_result(video_name, ResultJson.asr_done(result))
-
-    #  Combine ASR for Shots 
-    fd, shot_outs = tempfile.mkstemp()
-    result = combine_asr([result], [shot_outs])[0]
-    write_result(video_name, ResultJson.shot_done(result))
-
-    # Run Sequence Model  
-    seg_result = run_model(video_path, shot_outs, FEATURE_DIR)
-
-    # Aggregate Final results 
-    story_list = aggregate_results(seg_result, shot_outs)    
-    write_result(video_name, ResultJson.story_done(story_list))
 
 
 if __name__ == '__main__':

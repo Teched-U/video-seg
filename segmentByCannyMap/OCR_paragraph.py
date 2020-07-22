@@ -7,6 +7,7 @@ import pytesseract
 from pytesseract import Output
 #from swt import *
 import execnet
+import click
 
 class Words:
     type = None
@@ -202,13 +203,23 @@ def main(pathin):
 
 
 
-
-
-
-
-
-if __name__ == "__main__": #main()
-    image = cv2.imread("/Users/yizhizhang/Downloads/test_frames/46.jpg")
+def main(image):
     #image = cv2.imread("/Users/yizhizhang/Desktop/andrew.png")
+    image = cv2.imread(image)
     cnts = detect_paragraph(image)
     contours_text(image, cnts)
+
+
+@click.command()
+@click.option(
+    "-i",
+    "image",
+    default="/Users/yizhizhang/Downloads/test_frames/46.jpg",
+    help="Image to process"
+)
+def _main(image: str):
+    main(image)
+    
+
+if __name__ == "__main__": 
+    _main()

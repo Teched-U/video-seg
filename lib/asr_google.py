@@ -1,5 +1,6 @@
 from google.cloud import speech_v1
 from google.cloud.speech_v1 import enums
+from google.oauth2 import service_account
 import io
 import tempfile
 import wave
@@ -8,6 +9,7 @@ import numpy as np
 
 from google.cloud import storage
 
+SPEECH_SVC_JSON = '/home/techedu/speech_svc.json'
 
 def upload_blob(bucket_name, source_file_name, destination_blob_name):
     """Uploads a file to the bucket."""
@@ -30,8 +32,8 @@ def sample_recognize(storage_uri):
     """
     Transcribe a short audio file using synchronous speech recognition
     """
-
-    client = speech_v1.SpeechClient()
+    credentials = service_account.Credentials.from_service_account_file(SPEECH_SVC_JSON)
+    client = speech_v1.SpeechClient(credentials=credentials)
 
 
     # The language of the supplied audio

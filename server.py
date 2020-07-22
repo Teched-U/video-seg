@@ -22,15 +22,17 @@ def hello_world():
 def start_process(video_path):
         if 'requests' not in g:
                 g.requests = {}
-        
-        cmd = f"python process_video.py {video_path}"
-        proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
-        g.requests[video_path] = proc
+        if g.requests.get(video_path, None)  is not None:
+                cmd = f"python process_video.py {video_path}"
+                proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE) 
+                g.requests[video_path] = proc
+        else:
+                print(f'Already in process :{video_path}')
 
 
 CDN_URL = 'http://35.244.161.66/'
 
-@app.route('/upload', methods=['GET','POST'])
+@app.route('/api/upload', methods=['GET','POST'])
 def upload():
         if request.method == 'POST':
                 f = request.files['upload_file']
@@ -54,6 +56,7 @@ def cancel(video_id):
 @socketio.on('analysis')
 def get_process_stats(video_name):
         # Query the json log
+        print(video_name)
         video_name_no_suffix = os.path.basename(video_name).split('.')[0]
         result_path = os.path.join(RESULT_DIR, f'{video_name_no_suffix}.json')
         if os.path.exists(result_path):

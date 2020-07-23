@@ -32,7 +32,7 @@
 	Adding path compression, Find and Union are O(log*(n)) (the number of times needed to take 
 	the log of n until reaching 1), with effective amortized complexity O(1).
 """
-from node import Node
+from .node import Node
 
 
 class UnionFind:

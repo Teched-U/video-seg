@@ -31,7 +31,6 @@ def strokeWidthTransform(img, direction=1, cannyThresholds=(100,300)):
   edges = cv2.Canny(img, 100, 300)
 
   thetas = gradient(img, edges)
-  
   firstPass, rays = fastRay.castRays(edges, thetas, direction)
 
   if rays == None:
@@ -219,7 +218,8 @@ def getWidthOfLetters(img):
 if __name__ == "__main__":
   #img = np.array(Image.open('/Users/yizhizhang/Downloads/test_frames/46.jpg').convert('L'))
   #img = np.array(Image.open('/Users/yizhizhang/Desktop/getSize3.png').convert('L'))
-  
+
+  # img = np.array(Image.open(sys.argv[1]).convert('L')) 
   img = np.load(sys.argv[1]) # load
   #plt.imshow(img)
   #plt.show()

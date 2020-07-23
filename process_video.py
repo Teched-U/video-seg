@@ -6,12 +6,14 @@ import os.path as path
 import sys
 from preprocess import google_transcribe , combine_asr, image_merge_preprocess
 from lib.asr_google import upload_blob
+from segmentByCannyMap.OCR_paragraph import ocr_lib 
 from run_model import run_model
 import tempfile
 import cv2
 import pickle
 from pathlib import Path
 import click
+from typing import List, Dict
 
 
 class ResultJson:
@@ -153,8 +155,20 @@ def aggregate_results(seg_result, input_file):
     return story_list
     
 
+def extract_outline(video_path: str, story_list: List[Dict]) -> List[Dict]:
+    for story in story_list:
+        start = story['timestamp']
+        end = story['timestamp'] + story['duration']
+        slides = ocr_lib(video_path, start, end)
+        story['outline'] = slides
+
+        # Also upload to google cloud (TODO?)
+
+    return story_list
+    
+
 def write_result(video_path, data):
-    print(f"Writing Data: {data} to {video_path}")
+    # print(f"Writing Data: {data} to {video_path}")
     video_name_no_prefix = Path(path.basename(video_path)).stem
     save_path = path.join(RESULT_DIR, f'{video_name_no_prefix}.json')
 
@@ -203,6 +217,11 @@ def run(video_name, video_dir=None, result_dir=None, asr_load_path=None, asr_sav
     # Aggregate Final results 
     story_list = aggregate_results(seg_result, model_input_file)    
     write_result(video_name, ResultJson.story_done(story_list))
+
+    # Extract outline
+    story_list = extract_outline(video_path, story_list)
+    write_result(video_name, ResultJson.outline_done(story_list))
+
 
 @click.command()
 @click.argument(

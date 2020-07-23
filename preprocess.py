@@ -40,7 +40,7 @@ def check_similarity(
 ) -> bool:
 
     # buffer window of 5 seconds 
-    WINDOW_LEN = 5
+    WINDOW_LEN = 3
     if cur_dur < WINDOW_LEN:
         print(f"shot duration only {cur_dur}")
         cur_frame_ms = cur_ts * 1000
@@ -110,7 +110,7 @@ def merge(video_file: str, segments: List[Dict]) -> List[Dict]:
         next_seg = segments[i] 
 
         # If duration of previous segment already long
-        while next_seg["timestamp"] - cur_ts <= 30:
+        while next_seg["timestamp"] - cur_ts <= 8:
             # A short segment, see if it has the identical visual content with the next one
             to_merge = check_similarity(
                 vid_cap, cur_ts, cur_seg["duration"], next_seg["timestamp"], next_seg['duration']

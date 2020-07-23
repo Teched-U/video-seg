@@ -62,13 +62,13 @@ cdef castRay(int startRow, int startColumn, angles, edgeIndices, int maxRayLengt
   cdef int height = angles.shape[0]
   cdef int width = angles.shape[1]
   cdef int rayLength = 1
-  cdef float rayDirection = angles[row][column]
   cdef int rayValid = False
   cdef int rayPixelRow
   cdef int rayPixelColumn
   cdef int oppositeDirection
   cdef int row = startRow
   cdef int column = startColumn
+  cdef float rayDirection = angles[row][column]
 
   ray = [(startRow, startColumn)]
 

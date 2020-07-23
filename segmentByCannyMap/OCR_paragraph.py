@@ -1,21 +1,26 @@
 import numpy as np
 import cv2
 import time
-from ccl import *
+from .ccl import *
 from matplotlib import pyplot as plt
 import pytesseract
 from pytesseract import Output
+from pathlib import Path
 import subprocess
+import os
 import json
+from typing import Dict
 #from swt import *
 import execnet
 import click
 
+SLIDE_PATH = '/data/slides'
+
 class Words:
     type = None
     def __init__(self, x, y, width, height, letters):
-        self.x = x
-        self.y = y
+        self.x = int(x)
+        self.y = int(y)
         # stroke width
         self.width = width
         # text height
@@ -24,6 +29,9 @@ class Words:
 
     def set_Type(self, type):
         self.type = type
+
+    def __str__(self):
+        return f"[x={self.x},y={self.y},width={self.width},height={self.height}]\nText:\n{self.text}"
 
 #  Text Segmentation
 def detect_paragraph(image):
@@ -53,6 +61,89 @@ def detect_paragraph(image):
     # cv2.imshow('image', image)
     # cv2.waitKey(0)
     # assert(0==1)
+
+def filter_ocr_results(d):
+    """
+    input:
+        d : {
+            'level': [...]
+            'page_num': [...],
+            'block_num': [...],
+            'par_num': [...],
+            'word_num': [...],
+            'left': [...],
+            'top': [...],
+            'width': [...],
+            'conf': [...],
+            'text': [...],
+        }
+
+    return:
+        bool: if should be treated as a valid ocr result 
+        dict: result dictionary with the same structure as the input.
+    """
+    CONF_THRESHOLD = 95
+    # VALID_WORD_THRESHOLD = 0
+
+    # Filter by individual conf score
+    result = {
+        'left': [],
+        'width': [],
+        'top': [],
+        'text': [],
+        'height': [],
+    }
+
+    valid_word = 0
+    for idx, conf in enumerate(d['conf']):
+        if int(conf) > CONF_THRESHOLD:
+            result['text'].append(d['text'][idx])
+            result['left'].append(d['left'][idx])
+            result['top'].append(d['top'][idx])
+            result['height'].append(d['height'][idx])
+            valid_word += 1
+            
+
+    # if 1.0 * valid_word / len(d['text']) < VALID_WORD_THRESHOLD:
+    #     return False, {}
+    if valid_word == 0:
+        return False, {} 
+
+    return True, result
+
+
+def analyze_ocr_result(d, x, y):
+    """
+    Input:
+        d: info
+        x: bounding box's x
+        y: bounding box's y
+
+
+    Anaylyze the result, output information :
+    1. average height
+    2. top-left coordinate
+    ...
+    """
+
+    heights = np.array(d['height'])
+    avg_height = np.mean(heights)
+
+    lefts = np.array(d['left'])
+    leftest = np.min(lefts)
+
+    tops = np.array(d['top'])
+    topest = np.min(tops)
+
+    results = {
+        'height': avg_height,
+        'top': topest+y,
+        'left': leftest+x,
+    }
+    return results
+
+
+
 
 def contours_text(orig, contours, frame_index):
     count = 0
@@ -88,40 +179,53 @@ def contours_text(orig, contours, frame_index):
             #new_num_arr = np.load('data.npy') # load
             file = 'data'+str(count)+'.npy'
             
-            python3_command = "/usr/local/bin/python2 swt.py " + file  # launch your python2 script using bash
+            python3_command = "python2 segmentByCannyMap/swt.py " + file  # launch your python2 script using bash
 
             process = subprocess.Popen(python3_command.split(), stdout=subprocess.PIPE)
             output, error = process.communicate()
             width = float(output.decode())
-            print("avg width:")
-            print(width)
-            print("Text:")
-            print(text)
+
             d = pytesseract.image_to_data(cropped, config = config, output_type = Output.DICT)
             n_boxes = len(d['text'])
-            sum = 0
-            count = 0
-            for i in range (n_boxes):
-                if int(d['conf'][i]) > 85:
-                    sum += d['height'][i]
-                    count += 1
-            if count == 0:
+
+            # Filtering based on conf score
+            valid, d = filter_ocr_results(d)
+            
+            if not valid:
                 continue
-            height = sum / count
-            print("height:")
-            print(height)
-            print()
-            words = create_text_objects(text, x, y, width, height)
+            
+            result = analyze_ocr_result(d, x, y)
+            result['width'] = width
+
+            words = create_text_objects(d, result)
             words_objects.append(words)
-            count += 1
     print("begin analysis")
-    content_analysis(words_objects, orig, frame_index)
+    return content_analysis(words_objects, orig, frame_index)
 
 
-def create_text_objects(text, x, y, width, height):
+def create_text_objects(d, result):
     # x, y, width, letters
-    words = Words(x, y, round(width), round(height), text)
+    words = d['text']
+    # TODO(different line words might join together here. Use some other seperators?)
+    text = ' '.join(words) 
+    words = Words(result['left'], result['top'], result['width'], result['height'], text)
+
     return words
+
+def merge_slides(data_arr):
+    prev_title = ""
+    merged_data_arr = []
+    for data in data_arr:
+        slide = data['result'] 
+        cur_title = slide['Title']
+
+        # TODO(word embedding?)
+        if prev_title != cur_title: 
+            merged_data_arr.append(data)
+            prev_title = cur_title
+
+    return merged_data_arr
+
 
 def content_analysis(objects, frame, frame_index):
     # sort text objects by their heights (ascending order)
@@ -130,10 +234,14 @@ def content_analysis(objects, frame, frame_index):
     index = 0
     # find title objects
     # while height difference exceeds 30?
-    while (diff <= 30):
+    while diff <= 30:
+        if index + 1 == len(sorted_objects):
+            break
+
         if (if_title(sorted_objects[index], frame)):
-            print("!!!Title Here")
-            print(sorted_objects[index].text)
+            print("!!!Title Here:")
+            print(sorted_objects[index])
+
             sorted_objects[index].set_Type("Title")
             diff = abs(sorted_objects[index + 1].y - sorted_objects[index].y)
         index += 1
@@ -146,8 +254,8 @@ def content_analysis(objects, frame, frame_index):
     x_mean = round(np.mean([c.x for c in not_titles]))
     y_max = sorted_objects[-1].y
     h_mean = round(np.mean([c.height for c in not_titles]))
-    for object in not_titles:
-        define_content_type(object, s_mean, x_mean, y_mean, y_max, h_mean)
+    for o in not_titles:
+        define_content_type(o, s_mean, x_mean, y_mean, y_max, h_mean)
     #import pdb;pdb.set_trace()
     # 按照y顺序print出title以及subtitle
     data = {}
@@ -168,15 +276,16 @@ def content_analysis(objects, frame, frame_index):
                 'y': object.y,
                 'height':object.height
             })
-        
-    with open('data'+str(frame_index)+'.txt', 'w') as outfile:
-        json.dump(data, outfile)
-    return 
+
+    if frame_index is not None:
+        with open('data'+str(frame_index)+'.txt', 'w') as outfile:
+            json.dump(data, outfile)
+    return data
 
     
 
 
-def if_title(object, frame):
+def if_title(o, frame):
     """
     the text line is in the upper third part of the frame
     the text line has more than three characters
@@ -184,26 +293,26 @@ def if_title(object, frame):
     one of three highest text lines
     """
     width, height = frame.shape
-    if (object.y <= height / 3):
-        if (len(object.text) > 3):
+    if (o.y <= height / 3):
+        if (len(o.text) > 3):
             #if (object.x < width / 2):
             return True
     return False
 
-def define_content_type(object, s_mean, x_mean, y_mean, y_max, h_mean):
+def define_content_type(o, s_mean, x_mean, y_mean, y_max, h_mean):
     # subtitle/key point if st > smean ^ ht > h_mean
-    if (object.width >= s_mean and object.height >= h_mean):
-        object.set_Type("Subtitle")
+    if (o.width >= s_mean and o.height >= h_mean):
+        o.set_Type("Subtitle")
         print("Subtitle:")
-        print(object.text)
-    elif (object.width <= s_mean and object.height < h_mean and abs(y_max - object.y) <= 10):
-        object.set_Type("Footline")
+        print(o.text)
+    elif (o.width <= s_mean and o.height < h_mean and abs(y_max - o.y) <= 10):
+        o.set_Type("Footline")
         print("Footline:")
-        print(object.text)
+        print(o.text)
     else:
-        object.set_Type("Normal")
+        o.set_Type("Normal")
         print("Normal:")
-        print(object.text)
+        print(o.text)
 
 
 def get_Canny(pathIn):
@@ -225,7 +334,7 @@ def get_Canny(pathIn):
     count = 0
     while success:
         temp = vid_cap.get(0)
-        cv2.imwrite("/Users/yizhizhang/Downloads/test_frames/" + str(count) + ".jpg", image)  # save frame as JPEG file
+        # cv2.imwrite("/data/test_frames/" + str(count) + ".jpg", image)  # save frame as JPEG file
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         canny = cv2.Canny(gray,50,150)
         frames.append(canny)
@@ -243,6 +352,52 @@ def get_Canny(pathIn):
     cv2.destroyAllWindows()
     return frames, duration, imgs
 
+def get_Canny_timestamps(pathIn, start, end):
+    STEP_TIME = 3
+    # Canny maps
+    frames = []
+    # imgs
+    imgs = []
+    vid_cap = cv2.VideoCapture(pathIn)
+          
+    if vid_cap.isOpened():
+        # get rate
+        rate=vid_cap.get(5)
+        # get frame number
+        FrameNumber=vid_cap.get(7)
+        duration=FrameNumber/rate
+
+    success, image = vid_cap.read()
+    cur_ts = start
+    timestamps = []
+    video_name_no_suffix = os.path.basename(pathIn).split('.')[0]
+    img_dir = Path(os.path.join(SLIDE_PATH, video_name_no_suffix))
+    img_dir.mkdir(parents=True, exist_ok=True)
+    img_paths = []
+
+    while cur_ts <= end:
+        temp = vid_cap.get(0)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        canny = cv2.Canny(gray,50,150)
+        frames.append(canny)
+        imgs.append(image)
+    
+        # Save to image
+        img_path = os.path.join(img_dir, f'{cur_ts*1000}.jpg')
+        cv2.imwrite(img_path, image)
+        img_paths.append(img_path)
+        vid_cap.set(cv2.CAP_PROP_POS_MSEC, 1000 * cur_ts)
+        success, image = vid_cap.read()
+        cur_ts += STEP_TIME
+        timestamps.append(cur_ts)
+
+    # When everything done, release the capture
+    vid_cap.release()
+    cv2.destroyAllWindows()
+    return frames, timestamps, imgs, img_paths
+
+
+
 def get_Differential(frames):
     differentials = []
     for i in range(1,len(frames)):
@@ -250,6 +405,74 @@ def get_Differential(frames):
     return differentials
 
 
+def ocr_lib(pathin, start, end):
+    """
+    Args:
+    - pathin: str,  video path 
+    - start: float, starting time 
+    - end: float, ending time
+
+    Return :
+    [
+        {
+            timestamp:...,
+            result: ...,
+            slide: ...,
+        }
+    ]
+
+    """
+
+    # Get Canny
+    frames, timestamps, imgs, img_paths = get_Canny_timestamps(pathin, start, end)
+
+    # Get keyframes
+    differentials = get_Differential(frames)
+
+    CCs2 = []
+    for differential in differentials:
+        #change to bool image
+        arr = np.asarray(differential)
+        arr = arr[0:int(0.2 * differential.shape[1]),:]
+        arr = arr != 255
+        # CC Analysis
+        result = connected_component_labelling(arr, 4)
+        CCs2.append(np.max(result))
+    CCs2 = np.array(CCs2)
+    tmp = np.where(CCs2 >20)[0]
+    index2 = np.insert(tmp + 1, 0, 0)
+    key_frames_index = index2 
+
+    print(f"Final Key Frame Index: {key_frames_index}")
+
+    # Prepare for OCR
+    final_key_frames = [imgs[i] for i in key_frames_index]
+    final_timestamps = [timestamps[i] for i in key_frames_index]
+    final_img_paths = [img_paths[i] for i in key_frames_index]
+    # import pdb;pdb.set_trace()
+    #for f in final_key_frames:
+    #    plt.imshow(f)
+    #    plt.show()
+    frame_count = 0
+
+    # frame count + 几秒抽一帧
+    data_arr = []
+    for frame, ts, img_path in zip(final_key_frames, final_timestamps, final_img_paths):
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        cnts = detect_paragraph(gray)
+        data = contours_text(gray, cnts, key_frames_index[frame_count])
+        data_arr.append({
+            'timestamp': ts,
+            'result': data,
+            'slide': img_path
+        })
+        frame_count += 1
+
+
+    # Merge similar slides 
+    slides = merge_slides(data_arr)
+
+    return slides
 
   
   
@@ -302,6 +525,7 @@ def main(pathin):
     tmp = np.where(CCs2 >20)[0]
     index2 = np.insert(tmp + 1, 0, 0)
     key_frames_index = np.array([index[i] for i in index2])
+    print(f"Final Key Frame Index: {key_frames_index}")
     
     final_key_frames = [imgs[i] for i in key_frames_index]
     # import pdb;pdb.set_trace()
@@ -316,19 +540,6 @@ def main(pathin):
         contours_text(gray, cnts, key_frames_index[frame_count])
         frame_count += 1
 
-
-    #import pdb;pdb.set_trace()
-
-
-
-
-
-
-def main(image):
-    #image = cv2.imread("/Users/yizhizhang/Desktop/andrew.png")
-    image = cv2.imread(image)
-    cnts = detect_paragraph(image)
-    contours_text(image, cnts)
 
 
 @click.command()

@@ -22,7 +22,7 @@
 
 import numpy as np
 from PIL import Image
-from union_find import UnionFind
+from .union_find import UnionFind
 from matplotlib import pyplot as plt
 
 

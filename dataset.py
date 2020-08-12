@@ -195,7 +195,7 @@ class VideoSegDataset(Dataset):
         print(f"Run bert for {data['video_name']}")
         video_folder = os.path.dirname(data['video_name'])
         bert_feature_path = os.path.join(video_folder, 'bert_feature.pkl')
-        if os.path.exists(bert_feature_path):
+        if not os.path.exists(bert_feature_path):
             s_t = time.time()
             result = [self.run_bert(sentence) for sentence in sentences]
             print("Time cose:", time.time() - s_t)
@@ -214,7 +214,7 @@ class VideoSegDataset(Dataset):
         # TODO(OY): encode video features
         print(f"Run Video for {data['video_name']}")
         video_feature_path = os.path.join(video_folder, 'video_feature.pkl')
-        if os.path.exists(video_feature_path):
+        if not os.path.exists(video_feature_path):
             video_features = []
             timestamps = [0.0] + timestamps
             s_t = time.time()

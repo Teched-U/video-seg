@@ -211,10 +211,11 @@ class VideoSegPrediction():
 
 
 if __name__ == "__main__":
+    # video_model = VideoSegPrediction('/data/Exp/test-dev-video-seg/checkpoint/best_model.pd')
     video_model = VideoSegPrediction('/data/Exp/test-dev-video-seg/checkpoint/best_model.pd')
     # video_model = VideoSegPrediction()
-    # res = video_model.test_one_video('/data/easytopic-data/2PhaT6AbH3Q/2PhaT6AbH3Q.mp4')
-    res = video_model.test_one_video('/data/demo_videos/operating_system_demo_video1.mp4')
+    res = video_model.test_one_video('/data/easytopic-data/2PhaT6AbH3Q/2PhaT6AbH3Q.mp4')
+    # res = video_model.test_one_video('/data/demo_videos/operating_system_demo_video1.mp4')
     print(res)
     print("Shape:", np.shape(res))
 

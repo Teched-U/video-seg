@@ -43,4 +43,3 @@ def evaluate_metrics(predicted: torch.Tensor, ts : List[float], gt : Dict) -> Tu
     else:
 	    fscore = 0
     return recall, precision, fscore
-

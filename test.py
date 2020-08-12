@@ -75,13 +75,18 @@ class VideoSegPrediction():
             # return self.bert_model(**inputs)[0][0][0]
             return last_hidden_states[0][0]
 
-    def encode_features(self, data):
+    def encode_features(self, data, feature_dir=None):
         sentences = [shot["transcript"] for shot in data['features']]
         timestamps = [shot["timestamp"] for shot in data['features']]
         self.timestamps = timestamps
-
+        video_name = os.path.basename(data['video_name']).split('.')[0]
         video_folder = os.path.dirname(data['video_name'])
-        bert_feature_path = os.path.join(video_folder, 'bert_feature.pkl')
+
+        if feature_dir:
+            bert_feature_path = os.path.join(feature_dir, f'{video_name}_bert_feature.pkl')
+        else:
+            bert_feature_path = os.path.join(video_folder, 'bert_feature.pkl')
+
         if not os.path.exists(bert_feature_path):
             print("Run Bert...")
             s_t = time.time()
@@ -89,7 +94,7 @@ class VideoSegPrediction():
             print("Time cost:", time.time() - s_t)
             torch.save(torch.stack(result), bert_feature_path)
         else:
-            # print("Read bert feature", bert_feature_path)
+            print("Read bert feature", bert_feature_path)
             result = torch.load(bert_feature_path)
 
         vecs = []
@@ -99,7 +104,10 @@ class VideoSegPrediction():
             ts.append(t)
 
         # TODO(OY): encode video features
-        video_feature_path = os.path.join(video_folder, 'video_feature.pkl')
+        if feature_dir:
+            video_feature_path = os.path.join(feature_dir, f'{video_name}_video_feature.pkl')
+        else:
+            video_feature_path = os.path.join(video_folder, 'video_feature.pkl')
         if not os.path.exists(video_feature_path):
             video_features = []
             timestamps = [0.0] + timestamps
@@ -117,8 +125,8 @@ class VideoSegPrediction():
 
 
         # Not enough valid vecotors
-        if len(vecs) < MIN_SHOTS_NUM:
-            return [], [], []
+        # if len(vecs) < MIN_SHOTS_NUM:
+        #     return [], [], []
         return vecs, ts, video_features
 
     def encode_gt(self, data, timestamp, video):
@@ -157,11 +165,14 @@ class VideoSegPrediction():
 
         return gt
 
-    def test_one_video(self, video_path):
+    def test_one_video(self, video_path, json_path=None, feature_dir=None):
         # self.NAME = '04_special-applications-face-recognition-neural-style-transfer'
         self.NAME = os.path.basename(video_path).split('.')[0]
         self.ROOT = os.path.dirname(video_path)
-        self.JSON_PATH = os.path.join(self.ROOT, self.NAME+".json")
+        if not json_path:
+            self.JSON_PATH = os.path.join(self.ROOT, self.NAME+".json")
+        else:
+            self.JSON_PATH = json_path
 
         input = None
         data = {}
@@ -170,7 +181,7 @@ class VideoSegPrediction():
                 data = pickle.load(f)
             except Exception:
                 print(f"error loading {self.JSON_PATH}")
-            asr_feature, timestamp, video_feature = self.encode_features(data)
+            asr_feature, timestamp, video_feature = self.encode_features(data, feature_dir)
 
         if asr_feature:
             # import ipdb; ipdb.set_trace()
@@ -197,12 +208,16 @@ class VideoSegPrediction():
             target_idx.reshape(-1)
 
             print(np.array(self.timestamps)[res == 1])
-
+            
+            # Hack so that at least one story outputed
+            if len(target_idx) == 0:
+                res[0] = 1
             # save result
-            with open(self.JSON_PATH, "wb") as f:
-                data['Seg'] = res.tolist()
-                pickle.dump(data, f)
+            # with open(self.JSON_PATH, "wb") as f:
+            #     data['Seg'] = res.tolist()
+            #     pickle.dump(data, f)
             return res
+
         else:
             print("Bad video")
 
@@ -218,7 +233,6 @@ if __name__ == "__main__":
     # res = video_model.test_one_video('/data/demo_videos/operating_system_demo_video1.mp4')
     print(res)
     print("Shape:", np.shape(res))
-
 
 
 

@@ -3,10 +3,17 @@
 from sklearn.metrics import silhouette_samples, silhouette_score
 from random import randint
 import sys
-from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances, polynomial_kernel, sigmoid_kernel, cosine_distances
+from sklearn.metrics.pairwise import (
+    cosine_similarity,
+    euclidean_distances,
+    polynomial_kernel,
+    sigmoid_kernel,
+    cosine_distances,
+)
 import numpy as np
 from joblib import Parallel, delayed
 import multiprocessing
+
 
 class Individual:
     def __init__(self):
@@ -14,9 +21,22 @@ class Individual:
         self.fit_value = 0
 
 
-
 class GeneticAlgorithm:
-    def __init__(self, population_size, constructiveHeuristic_percent, mutation_rate, cross_over_rate, shots, docSim, n_chunks, generations, local_search_percent, video_length, stopwords, ocr_on):
+    def __init__(
+        self,
+        population_size,
+        constructiveHeuristic_percent,
+        mutation_rate,
+        cross_over_rate,
+        shots,
+        docSim,
+        n_chunks,
+        generations,
+        local_search_percent,
+        video_length,
+        stopwords,
+        ocr_on,
+    ):
 
         self.population_size = population_size
         self.constructiveHeuristic_percent = constructiveHeuristic_percent
@@ -47,7 +67,8 @@ class GeneticAlgorithm:
         self.max_topic_duration_in_seconds = 300
         self.min_topic_duration_in_seconds = 300
 
-    '''calculate the similarity between neighbor audio chunks'''
+    """calculate the similarity between neighbor audio chunks"""
+
     def buildWindowSim(self):
         sim_win = []
         for i in range(len(self.shots) - 1):
@@ -56,7 +77,8 @@ class GeneticAlgorithm:
 
         self.sim_windows = sim_win
 
-    '''calculates the fit value of an individual'''
+    """calculates the fit value of an individual"""
+
     def calculate_fit_value(self, individual):
         count = 0
         depths = []
@@ -71,21 +93,30 @@ class GeneticAlgorithm:
                 elif i == len(individual.dna) - 1:
                     depths.append(self.sim_windows[i - 1] - self.sim_windows[i])
                 else:
-                    depths.append(self.sim_windows[i - 1] - self.sim_windows[i]
-                                  + self.sim_windows[i + 1] - self.sim_windows[i])
+                    depths.append(
+                        self.sim_windows[i - 1]
+                        - self.sim_windows[i]
+                        + self.sim_windows[i + 1]
+                        - self.sim_windows[i]
+                    )
                 # utility value of a point i
-                sum_utility_points += self.shots[i].pause_duration + 0.02 * self.shots[i].duration
-                + ((1 + (i/(len(self.shots)-1)) * 0.1) * self.shots[i].volume) + 10 * depths[-1] +\
-                                           self.shots[i].pitch * 0.01 + self.shots[i].adv_count
+                sum_utility_points += (
+                    self.shots[i].pause_duration + 0.02 * self.shots[i].duration
+                )
+                +(
+                    (1 + (i / (len(self.shots) - 1)) * 0.1) * self.shots[i].volume
+                ) + 10 * depths[-1] + self.shots[i].pitch * 0.01 + self.shots[
+                    i
+                ].adv_count
                 count += 1
 
         if count > 0:
-            individual.fit_value = 0.4 * sum_utility_points - \
-                                   0.6 * count
+            individual.fit_value = 0.4 * sum_utility_points - 0.6 * count
         else:
             individual.fit_value = -100000
 
-    '''gets the word embeddings representation of audio transcripts'''
+    """gets the word embeddings representation of audio transcripts"""
+
     def getVectorRepresentation(self):
         samples = []
         i = 0
@@ -95,16 +126,17 @@ class GeneticAlgorithm:
 
         self.samples_features = samples
 
-    '''Implements the 2-point crossover'''
+    """Implements the 2-point crossover"""
+
     def crossover(self, individual1, individual2):
         new_dna = []
-        point1 = randint(0,self.dna_size -2)
-        point2 = randint(0,self.dna_size -2)
+        point1 = randint(0, self.dna_size - 2)
+        point2 = randint(0, self.dna_size - 2)
 
-        while(point1 == point2):
-            point2 = randint(0,len(individual1.dna) -1)
+        while point1 == point2:
+            point2 = randint(0, len(individual1.dna) - 1)
 
-        if(point1 < point2):
+        if point1 < point2:
             new_dna += individual1.dna[:point1]
             new_dna += individual2.dna[point1:point2]
             new_dna += individual1.dna[point2:]
@@ -115,20 +147,24 @@ class GeneticAlgorithm:
 
         return new_dna
 
-    '''Implements the mutation'''
+    """Implements the mutation"""
+
     def mutation(self, individual):
         index = randint(0, self.dna_size - 1)
 
-        if (individual.dna[index] == 1):
+        if individual.dna[index] == 1:
             individual.dna[index] = 0
         else:
             individual.dna[index] = 1
 
-    '''Initializes the population'''
+    """Initializes the population"""
+
     def initializePopulation(self):
 
-        '''Fully random population initialization'''
-        for i in range(int(self.population_size*(1-self.constructiveHeuristic_percent))):
+        """Fully random population initialization"""
+        for i in range(
+            int(self.population_size * (1 - self.constructiveHeuristic_percent))
+        ):
             individual = Individual()
             for j in range(self.dna_size):
                 gene = randint(0, 1)
@@ -136,15 +172,15 @@ class GeneticAlgorithm:
 
             self.individuals.append(individual)
 
-
-        '''Heuristic population initialization'''
-        for i in range(int(self.population_size*self.constructiveHeuristic_percent)):
+        """Heuristic population initialization"""
+        for i in range(int(self.population_size * self.constructiveHeuristic_percent)):
             individual = Individual()
             individual.dna = self.constructiveHeuristic()
 
             self.individuals.append(individual)
 
-    '''Runs the steps of GeneticAlgorithm'''
+    """Runs the steps of GeneticAlgorithm"""
+
     def run(self):
         num_cores = multiprocessing.cpu_count()
 
@@ -154,24 +190,26 @@ class GeneticAlgorithm:
         best_fit = -1000000
         k_coefficient = 1
         while iter < self.generations:
-            num_of_crossovers = self.population_size - int(self.cross_over_rate * self.population_size)
+            num_of_crossovers = self.population_size - int(
+                self.cross_over_rate * self.population_size
+            )
 
-            '''Evaluates the population'''
+            """Evaluates the population"""
             for p in self.individuals:
                 self.calculate_fit_value(p)
 
-            '''Sort the population in the reverse order by the fit
-             value of the individuals'''
+            """Sort the population in the reverse order by the fit
+             value of the individuals"""
             self.individuals.sort(key=lambda x: x.fit_value, reverse=True)
 
-            '''Calls the localsearch on the best individuals'''
-            for i in range(int(self.population_size*self.local_search_percent)):
+            """Calls the localsearch on the best individuals"""
+            for i in range(int(self.population_size * self.local_search_percent)):
                 self.localsearch(self.individuals[i])
 
             self.individuals.sort(key=lambda x: x.fit_value, reverse=True)
 
-            #print(self.individuals[0].fit_value)
-            if(self.individuals[0].fit_value > best_fit):
+            # print(self.individuals[0].fit_value)
+            if self.individuals[0].fit_value > best_fit:
                 print("Objective function value: " + str(self.individuals[0].fit_value))
 
                 best_fit = self.individuals[0].fit_value
@@ -181,19 +219,27 @@ class GeneticAlgorithm:
                 if iterations_without_change > 150:
                     break
 
-            '''Selects the individuals for crossover'''
+            """Selects the individuals for crossover"""
             for i in range(num_of_crossovers):
-                parent1 = randint(0, int(self.cross_over_rate * self.population_size) - 1)
+                parent1 = randint(
+                    0, int(self.cross_over_rate * self.population_size) - 1
+                )
                 parent2 = randint(0, int(self.population_size) - 1)
                 while parent1 == parent2:
-                    parent2 = randint(0, int(self.cross_over_rate * self.population_size) - 1)
+                    parent2 = randint(
+                        0, int(self.cross_over_rate * self.population_size) - 1
+                    )
 
-                new_dna = self.crossover(self.individuals[parent1], self.individuals[parent2])
-                self.individuals[int(self.cross_over_rate * self.population_size)+i].dna = new_dna
-                #self.mutation(self.individuals[int(self.cross_over_rate * self.population_size)+i])
-            '''Apply mutation on the individuals according to a probability'''
-            for i in range(int(self.population_size*self.mutation_rate)):
-                individual_index = randint(0, self.population_size-1)
+                new_dna = self.crossover(
+                    self.individuals[parent1], self.individuals[parent2]
+                )
+                self.individuals[
+                    int(self.cross_over_rate * self.population_size) + i
+                ].dna = new_dna
+                # self.mutation(self.individuals[int(self.cross_over_rate * self.population_size)+i])
+            """Apply mutation on the individuals according to a probability"""
+            for i in range(int(self.population_size * self.mutation_rate)):
+                individual_index = randint(0, self.population_size - 1)
                 self.mutation(self.individuals[individual_index])
 
             iter += 1
@@ -204,10 +250,11 @@ class GeneticAlgorithm:
             if best_solution[i] == 1:
                 u.append(self.shots[i].init_time)
 
-        '''return the best solution of all generations'''
+        """return the best solution of all generations"""
         return sorted(list(set(u)))
 
-    '''Implements a random greedy constructive heuristic for the problem'''
+    """Implements a random greedy constructive heuristic for the problem"""
+
     def constructiveHeuristic(self):
         hash_map = {}
         dna = [0]
@@ -215,17 +262,26 @@ class GeneticAlgorithm:
         depth = 0
         for i in range(len(self.shots)):
             if i == 0:
-                depth = (self.sim_windows[i + 1] - self.sim_windows[i])
+                depth = self.sim_windows[i + 1] - self.sim_windows[i]
 
             elif i == self.dna_size - 1:
-                depth = (self.sim_windows[i - 1] - self.sim_windows[i])
+                depth = self.sim_windows[i - 1] - self.sim_windows[i]
             else:
-                depth = (self.sim_windows[i - 1] - self.sim_windows[i] +
-                self.sim_windows[i + 1] - self.sim_windows[i])
+                depth = (
+                    self.sim_windows[i - 1]
+                    - self.sim_windows[i]
+                    + self.sim_windows[i + 1]
+                    - self.sim_windows[i]
+                )
 
-            hash_map[i] = self.shots[i].pause_duration + 0.02 * self.shots[i].duration + \
-                          ((1 + (i/(len(self.shots)-1)) * 0.1) * self.shots[i].volume) + \
-                          10 * depth + self.shots[i].pitch * 0.01 + self.shots[i].adv_count
+            hash_map[i] = (
+                self.shots[i].pause_duration
+                + 0.02 * self.shots[i].duration
+                + ((1 + (i / (len(self.shots) - 1)) * 0.1) * self.shots[i].volume)
+                + 10 * depth
+                + self.shots[i].pitch * 0.01
+                + self.shots[i].adv_count
+            )
 
         hash_map = sorted(hash_map.items(), key=lambda kv: kv[1], reverse=True)
 
@@ -245,37 +301,35 @@ class GeneticAlgorithm:
 
         return dna_f
 
-
-    #Divides one topic in two'''
+    # Divides one topic in two'''
     def divideTopic(self, dna):
-        index_split = randint(0, self.dna_size-1)
+        index_split = randint(0, self.dna_size - 1)
         max_attempts = 10
         attempts = 0
 
-        while(index_split != 0):
-            index_split = randint(0, self.dna_size-1)
+        while index_split != 0:
+            index_split = randint(0, self.dna_size - 1)
             attempts += 1
-            if(attempts >= max_attempts):
+            if attempts >= max_attempts:
                 break
 
-        if(dna[index_split] == 0):
+        if dna[index_split] == 0:
             dna[index_split] = 1
-
 
         return dna
 
     # Merge two topics in one'''
     def mergeTopic(self, dna):
-        index_merge = randint(0, self.dna_size-1)
+        index_merge = randint(0, self.dna_size - 1)
         max_attempts = 10
         attempts = 0
 
-        while(index_merge != 1):
-            index_merge = randint(0, self.dna_size-1)
-            attempts+=1
-            if(attempts >= max_attempts):
+        while index_merge != 1:
+            index_merge = randint(0, self.dna_size - 1)
+            attempts += 1
+            if attempts >= max_attempts:
                 break
-        if(dna[index_merge] == 1):
+        if dna[index_merge] == 1:
             dna[index_merge] = 0
 
         return dna
@@ -283,16 +337,15 @@ class GeneticAlgorithm:
     # Moves a topic bound to another place'''
     def moveBound(self, dna):
         index_init = randint(0, self.dna_size - 1)
-        steps = randint(0, self.dna_size-1 - index_init)
+        steps = randint(0, self.dna_size - 1 - index_init)
         dna[index_init] = 0
         dna[index_init + steps] = 1
 
         return dna
 
-
     # Explores the neighborhood of a solution trying to improve it'''
     def localsearch(self, individual):
-        movement_list = ['merge',  'divide', 'move']
+        movement_list = ["merge", "divide", "move"]
         self.calculate_fit_value(individual)
         current_fit_value = individual.fit_value
 
@@ -300,17 +353,17 @@ class GeneticAlgorithm:
         while True:
 
             previous_individual_dna = individual.dna
-            if movement_list[i] == 'merge':
+            if movement_list[i] == "merge":
                 individual.dna = self.mergeTopic(individual.dna)
-            elif movement_list[i] == 'divide':
+            elif movement_list[i] == "divide":
                 individual.dna = self.divideTopic(individual.dna)
-            elif movement_list[i] == 'move':
+            elif movement_list[i] == "move":
                 individual.dna = self.moveBound(individual.dna)
 
             self.calculate_fit_value(individual)
             post_search_fit_value = individual.fit_value
 
-            if post_search_fit_value > current_fit_value and movement_list[i] != 'move':
+            if post_search_fit_value > current_fit_value and movement_list[i] != "move":
                 i += 1
             elif post_search_fit_value <= current_fit_value:
                 i -= 1

@@ -95,4 +95,3 @@ if __name__ == "__main__":
     print(features)
     print("features.shape, type(features)", features.shape, type(features))
     print("Feature extract time for one video:", time.time() - s_t)
-# plt.imshow(sampled_frames[1])

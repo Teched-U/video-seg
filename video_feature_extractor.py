@@ -60,4 +60,3 @@ if __name__ == "__main__":
     print("Feature extract time for one video:", time.time() - s_t)
 # plt.imshow(sampled_frames[1])
 
-

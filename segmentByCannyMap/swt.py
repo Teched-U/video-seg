@@ -14,6 +14,7 @@ import fastRay
 from skimage import color
 import matplotlib.pyplot as plt
 from PIL import Image
+import sys
 
 t = Timer()
 def strokeWidthTransform(img, direction=1, cannyThresholds=(100,300)):
@@ -26,6 +27,7 @@ def strokeWidthTransform(img, direction=1, cannyThresholds=(100,300)):
   return --
   2d grayscale array where each pixel's value  is its stroke width 
   """
+  img = np.array(img)
   edges = cv2.Canny(img, 100, 300)
 
   thetas = gradient(img, edges)
@@ -200,7 +202,7 @@ def gradient(img, edges):
         theta[row][col] = math.atan2(dy[row][col], dx[row][col])
   return theta
 
-def getSize(img):
+def getWidthOfLetters(img):
   """ Returns size of letters
   arguments --
   img: grayscale image
@@ -209,13 +211,21 @@ def getSize(img):
   average size of letters in the img
   """
   swtImg = strokeWidthTransform(img)
-  avg = np.nanmean(np.where(swtImg!=0, swtImg, np.nan))
+  # plt.imshow(swtImg)
+  # plt.show()
+  avg = np.nanmean(np.where(swtImg!=255, swtImg, np.nan))
   return avg
 
 if __name__ == "__main__":
-  img = np.array(Image.open('/Users/yizhizhang/Downloads/test_frames/46.jpg').convert('L'))
+  #img = np.array(Image.open('/Users/yizhizhang/Downloads/test_frames/46.jpg').convert('L'))
+  #img = np.array(Image.open('/Users/yizhizhang/Desktop/getSize3.png').convert('L'))
+  
+  img = np.load(sys.argv[1]) # load
+  #plt.imshow(img)
+  #plt.show()
   #swtImg = strokeWidthTransform(img)
-  size = getSize(img)
+  size = getWidthOfLetters(img)
+  #return size
   print(size)
   #plt.imshow(swtImg)
   #plt.show()
